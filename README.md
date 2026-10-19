@@ -1,7 +1,7 @@
 # Trabalho Design e Arquitetura de Software (CI1163-2026/2)
 
 ## Integrantes
-- João (XXX)
+- João Marcelo Caboclo (20221227)
 - Luíza (XXX)
 - Nadia Luana Lobkov (20232381)
 
