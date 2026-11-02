@@ -1,0 +1,116 @@
+# Requisitos — Sistema de manutenção de equipamentos de laboratório
+
+
+## 1. Requisitos funcionais
+
+### RF01 — Registrar chamado de manutenção
+
+O sistema deve permitir que o solicitante registre um chamado de manutenção, informando o equipamento, a descrição do problema e a data da ocorrência. O registro deve permitir a inclusão de informações adicionais e identificar o solicitante e a data e hora de abertura.
+
+**Justificativa:** formalizar o pedido de manutenção e reunir as informações necessárias para iniciar o atendimento.
+
+### RF02 — Consultar chamados
+
+O sistema deve permitir que usuários autorizados consultem os chamados registrados, incluindo sua descrição, equipamento, prioridade, departamento responsável, técnicos atribuídos e estado atual.
+
+**Justificativa:** permitir o acompanhamento das solicitações e do andamento dos atendimentos.
+
+### RF03 — Filtrar chamados
+
+O sistema deve permitir a filtragem dos chamados por equipamento, prioridade, técnico responsável, estado, período de abertura, solicitante e departamento responsável. Os filtros devem poder ser utilizados individualmente ou em conjunto.
+
+**Justificativa:** facilitar a localização de chamados e o acompanhamento das demandas de manutenção.
+
+### RF04 — Definir e alterar a prioridade do chamado
+
+O sistema deve permitir que o coordenador de manutenção responsável classifique ou altere a prioridade de um chamado entre baixa, média, alta e crítica.
+
+**Justificativa:** organizar o atendimento conforme a urgência do problema e seu impacto nas atividades do laboratório.
+
+### RF05 — Atribuir técnicos ao chamado
+
+O sistema deve permitir que o coordenador de manutenção atribua técnicos autorizados aos chamados sob responsabilidade de seu departamento.
+
+**Justificativa:** distribuir os atendimentos considerando as competências e a disponibilidade dos técnicos.
+
+### RF06 — Consultar o histórico de manutenção do equipamento
+
+O sistema deve permitir que usuários autorizados consultem o histórico de manutenção de um equipamento, incluindo os chamados anteriores, as descrições dos problemas, as datas das ocorrências, os diagnósticos e as intervenções registradas, os técnicos responsáveis e as datas de conclusão, quando disponíveis.
+
+**Justificativa:** apoiar a identificação de problemas recorrentes e a consulta às soluções adotadas anteriormente.
+
+### RF07 — Concluir chamado
+
+O sistema deve permitir que um técnico atribuído ao chamado conclua o atendimento somente após registrar a intervenção realizada, descrevendo como o problema foi resolvido.
+
+Ao concluir o chamado, o sistema deve registrar automaticamente a data e hora da conclusão e identificar o técnico que realizou essa operação, preservando as intervenções e os respectivos autores.
+
+**Justificativa:** encerrar formalmente o atendimento e manter o registro da solução aplicada ao equipamento.
+
+### RF08 — Notificar o solicitante sobre a conclusão
+
+O sistema deve gerar uma notificação ao solicitante após a conclusão do chamado, informando sua identificação e disponibilizando a descrição da intervenção realizada.
+
+**Justificativa:** comunicar ao solicitante que o atendimento foi concluído e permitir a consulta à solução registrada.
+
+
+### RF09 — Encaminhar chamado para outro departamento
+
+O sistema deve permitir que o coordenador responsável encaminhe um chamado para outro departamento de manutenção, indicando o departamento de destino e a justificativa do encaminhamento. A operação deve preservar o histórico e registrar os responsáveis e a data e hora da transferência.
+
+**Justificativa:** direcionar o atendimento ao departamento com competência para resolver o problema.
+
+## 3. Restrições e regras de negócio
+
+### RN01 — Vínculo obrigatório com equipamento existente
+
+Todo chamado deve estar associado a um equipamento existente no cadastro utilizado pelo sistema. O sistema deve impedir a abertura de chamados sem esse vínculo.
+
+**Justificativa:** preservar a integridade do histórico de manutenção de cada equipamento.
+
+### RN02 — Atribuição exclusiva a técnicos autorizados
+
+O sistema deve impedir que um chamado seja atribuído a um usuário sem função de técnico ou sem autorização para o atendimento.
+
+**Justificativa:** garantir que apenas profissionais habilitados recebam chamados.
+
+### RN03 — Respeito ao fluxo de estados
+
+O sistema deve permitir somente as transições previstas no fluxo de atendimento definido para os chamados.
+
+Aberto → Atribuído → Em atendimento → Concluído.
+
+Nesse fluxo, a passagem direta de Aberto para Concluído deve ser impedida. A conclusão também deve atender à exigência de registro da intervenção estabelecida no RF07.
+
+**Justificativa:** evitar estados incompatíveis com o andamento do atendimento e preservar a coerência do histórico.
+
+## 4. Requisitos arquiteturalmente significativos — ASRs
+
+### ASR01 — Rastreabilidade do histórico de manutenção
+
+O sistema deve manter registros de auditoria das alterações de estado, prioridade, atribuição de técnicos e departamento responsável, bem como dos registros e alterações de diagnósticos e intervenções. Cada registro deve identificar o chamado, o autor, a data e hora e, quando aplicável, os valores anteriores e posteriores à alteração.
+
+Alterações posteriores não devem apagar os registros necessários para reconstruir a sequência dos acontecimentos.
+
+**Critério de verificação:** após uma sequência de alterações em um chamado, deve ser possível consultar quem realizou cada operação, quando ela ocorreu e quais informações foram modificadas.
+
+**Impacto arquitetural:** exige uma estratégia consistente de auditoria e persistência do histórico em todas as operações abrangidas.
+
+### ASR02 — Controle de acesso por papel e departamento 
+
+O sistema deve verificar a autorização em cada operação, considerando o papel do usuário e seu vínculo com o chamado ou departamento responsável. A verificação deve ocorrer também nas operações solicitadas diretamente à API.
+
+**Critério de verificação:** uma tentativa de executar uma operação sem a permissão correspondente deve ser recusada, sem alterar os dados do chamado.
+
+**Impacto arquitetural:** exige uma política de autorização aplicada de forma consistente nos pontos de acesso às funcionalidades.
+
+**Definição pendente:** especificar quais chamados cada ator pode consultar e quais permissões se aplicam a atendimentos entre departamentos.
+
+### ASR03 — Confiabilidade das notificações
+
+A conclusão de um chamado deve ser preservada mesmo quando o serviço de notificações estiver indisponível. O sistema deve registrar a notificação pendente e realizar novas tentativas de envio após o restabelecimento do serviço.
+
+**Critério de verificação:** ao concluir um chamado durante uma indisponibilidade do serviço de notificações, o chamado deve permanecer concluído e a notificação deve continuar disponível para nova tentativa de envio.
+
+**Impacto arquitetural:** exige tratar a conclusão do chamado e a entrega da notificação de forma independente, preservando as notificações pendentes.
+
