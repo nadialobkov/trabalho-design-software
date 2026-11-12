@@ -3,9 +3,9 @@
 ## Problema
 - [ ] Definir contexto do sistema
 - [ ] Identificar principais atores
-- [ ] Definir 6-10 requisitos funcionais
-- [ ] Identificar restrições relevantes
-- [ ] Selecionar e descrever 3 ASRs (com justificativa)
+- [x] Definir 6-10 requisitos funcionais
+- [x] Identificar restrições relevantes
+- [x] Selecionar e descrever 3 ASRs (com justificativa)
 
 ## Domínio
 
