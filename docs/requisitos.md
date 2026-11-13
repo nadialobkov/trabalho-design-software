@@ -41,17 +41,20 @@ O sistema deve permitir que usuários autorizados consultem o histórico de manu
 
 ### RF07 — Concluir chamado
 
-O sistema deve permitir que um técnico atribuído ao chamado conclua o atendimento somente após registrar a intervenção realizada, descrevendo como o problema foi resolvido.
+O sistema deve permitir que um técnico atribuído ao chamado conclua o atendimento. Na conclusão, o técnico deve registrar o diagnóstico, indicando a causa encontrada, e a intervenção realizada, descrevendo como o problema foi resolvido. O chamado não pode ser concluído sem essas duas descrições.
 
-Ao concluir o chamado, o sistema deve registrar automaticamente a data e hora da conclusão e identificar o técnico que realizou essa operação, preservando as intervenções e os respectivos autores.
+Ao concluir o chamado, o sistema deve registrar automaticamente a data e hora da conclusão e identificar o técnico que realizou essa operação como autor da intervenção.
 
 **Justificativa:** encerrar formalmente o atendimento e manter o registro da solução aplicada ao equipamento.
 
-### RF08 — Notificar o solicitante sobre a conclusão
+### RF08 — Notificar o solicitante por e-mail
 
-O sistema deve gerar uma notificação ao solicitante após a conclusão do chamado, informando sua identificação e disponibilizando a descrição da intervenção realizada.
+O sistema deve enviar um e-mail ao solicitante:
 
-**Justificativa:** comunicar ao solicitante que o atendimento foi concluído e permitir a consulta à solução registrada.
+- na abertura do chamado, confirmando o registro e informando sua identificação;
+- na conclusão do chamado, informando sua identificação e a descrição da intervenção realizada.
+
+**Justificativa:** confirmar ao solicitante que o pedido foi recebido e comunicar a conclusão do atendimento, permitindo a consulta à solução registrada.
 
 
 ### RF09 — Encaminhar chamado para outro departamento
@@ -59,6 +62,12 @@ O sistema deve gerar uma notificação ao solicitante após a conclusão do cham
 O sistema deve permitir que o coordenador responsável encaminhe um chamado para outro departamento de manutenção, indicando o departamento de destino e a justificativa do encaminhamento. A operação deve preservar o histórico e registrar os responsáveis e a data e hora da transferência.
 
 **Justificativa:** direcionar o atendimento ao departamento com competência para resolver o problema.
+
+### RF10 — Iniciar atendimento do chamado
+
+O sistema deve permitir que um técnico atribuído ao chamado inicie o atendimento, alterando seu estado de Atribuído para Em atendimento. Ao iniciar o atendimento, o sistema deve registrar automaticamente a data e hora do início e identificar o técnico que realizou a operação.
+
+**Justificativa:** indicar que o problema já está sendo tratado e permitir o acompanhamento do andamento do chamado.
 
 ## 3. Restrições e regras de negócio
 
@@ -80,7 +89,7 @@ O sistema deve permitir somente as transições previstas no fluxo de atendiment
 
 Aberto → Atribuído → Em atendimento → Concluído.
 
-Nesse fluxo, a passagem direta de Aberto para Concluído deve ser impedida. A conclusão também deve atender à exigência de registro da intervenção estabelecida no RF07.
+Nesse fluxo, a passagem direta de Aberto para Concluído deve ser impedida. A conclusão também deve atender à exigência de registro do diagnóstico e da intervenção estabelecida no RF07.
 
 **Justificativa:** evitar estados incompatíveis com o andamento do atendimento e preservar a coerência do histórico.
 
@@ -104,13 +113,15 @@ O sistema deve verificar a autorização em cada operação, considerando o pape
 
 **Impacto arquitetural:** exige uma política de autorização aplicada de forma consistente nos pontos de acesso às funcionalidades.
 
-**Definição pendente:** especificar quais chamados cada ator pode consultar e quais permissões se aplicam a atendimentos entre departamentos.
+**Visibilidade dos chamados:** o solicitante consulta os chamados que abriu; técnicos e coordenadores consultam os chamados do seu departamento.
+
+**Definição pendente:** especificar quais permissões se aplicam a atendimentos entre departamentos.
 
 ### ASR03 — Confiabilidade das notificações
 
-A conclusão de um chamado deve ser preservada mesmo quando o serviço de notificações estiver indisponível. O sistema deve registrar a notificação pendente e realizar novas tentativas de envio após o restabelecimento do serviço.
+O registro e a conclusão de um chamado devem ser preservados mesmo quando o serviço de notificações estiver indisponível. O sistema deve registrar a notificação pendente e realizar novas tentativas de envio após o restabelecimento do serviço.
 
-**Critério de verificação:** ao concluir um chamado durante uma indisponibilidade do serviço de notificações, o chamado deve permanecer concluído e a notificação deve continuar disponível para nova tentativa de envio.
+**Critério de verificação:** ao registrar ou concluir um chamado durante uma indisponibilidade do serviço de notificações, o chamado deve permanecer salvo e a notificação deve continuar disponível para nova tentativa de envio.
 
-**Impacto arquitetural:** exige tratar a conclusão do chamado e a entrega da notificação de forma independente, preservando as notificações pendentes.
+**Impacto arquitetural:** exige tratar o registro ou a conclusão do chamado e a entrega da notificação de forma independente, preservando as notificações pendentes.
 
