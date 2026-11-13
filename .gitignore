@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 .env
+
+# Local manual test plan, not part of the delivery
+test-trabalho.md
