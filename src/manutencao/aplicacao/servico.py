@@ -3,8 +3,8 @@ from datetime import date, datetime
 
 from manutencao.aplicacao.erros import AcessoNegado, EquipamentoNaoEncontrado
 from manutencao.aplicacao.filtros import FiltrosChamado
-from manutencao.aplicacao.notificador import Notificador
-from manutencao.aplicacao.repositorio import ManutencaoRepositorio
+from manutencao.aplicacao.interface_notificador import Notificador
+from manutencao.aplicacao.interface_repositorio import ManutencaoRepositorio
 from manutencao.dominio.chamado import Chamado
 from manutencao.dominio.notificacao import Notificacao
 from manutencao.dominio.registro_auditoria import RegistroAuditoria

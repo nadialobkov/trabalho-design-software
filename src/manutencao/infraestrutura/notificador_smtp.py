@@ -1,7 +1,7 @@
 import smtplib
 from email.message import EmailMessage
 
-from manutencao.aplicacao.notificador import Notificador
+from manutencao.aplicacao.interface_notificador import Notificador
 from manutencao.dominio.notificacao import Notificacao
 
 

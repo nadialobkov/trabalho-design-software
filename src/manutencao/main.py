@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 from manutencao.aapresentacao.agendador import AgendadorNotificacoes
 from manutencao.aapresentacao.controller import criar_app
-from manutencao.aplicacao.notificador import Notificador
-from manutencao.aplicacao.repositorio import ManutencaoRepositorio
+from manutencao.aplicacao.interface_notificador import Notificador
+from manutencao.aplicacao.interface_repositorio import ManutencaoRepositorio
 from manutencao.aplicacao.servico import ManutencaoService
 from manutencao.infraestrutura.notificador_fake import NotificadorFake
 from manutencao.infraestrutura.notificador_smtp import SmtpNotificador

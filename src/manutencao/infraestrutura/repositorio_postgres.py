@@ -4,7 +4,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from manutencao.aplicacao.filtros import FiltrosChamado
-from manutencao.aplicacao.repositorio import ManutencaoRepositorio
+from manutencao.aplicacao.interface_repositorio import ManutencaoRepositorio
 from manutencao.dominio.chamado import Chamado
 from manutencao.dominio.departamento import Departamento
 from manutencao.dominio.equipamento import Equipamento
