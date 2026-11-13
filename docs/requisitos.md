@@ -69,7 +69,7 @@ O sistema deve permitir que um técnico atribuído ao chamado inicie o atendimen
 
 **Justificativa:** indicar que o problema já está sendo tratado e permitir o acompanhamento do andamento do chamado.
 
-## 3. Restrições e regras de negócio
+## 2. Restrições e regras de negócio
 
 ### RN01 — Vínculo obrigatório com equipamento existente
 
@@ -93,7 +93,7 @@ Nesse fluxo, a passagem direta de Aberto para Concluído deve ser impedida. A co
 
 **Justificativa:** evitar estados incompatíveis com o andamento do atendimento e preservar a coerência do histórico.
 
-## 4. Requisitos arquiteturalmente significativos — ASRs
+## 3. Requisitos arquiteturalmente significativos — ASRs
 
 ### ASR01 — Rastreabilidade do histórico de manutenção
 
@@ -115,7 +115,7 @@ O sistema deve verificar a autorização em cada operação, considerando o pape
 
 **Visibilidade dos chamados:** o solicitante consulta os chamados que abriu; técnicos e coordenadores consultam os chamados do seu departamento.
 
-**Definição pendente:** especificar quais permissões se aplicam a atendimentos entre departamentos.
+**Atendimentos entre departamentos:** cada chamado tem um único departamento responsável. Quando o chamado é encaminhado (RF09), o acesso passa para o departamento de destino: seus técnicos e seu coordenador passam a consultá-lo e atendê-lo, e o departamento de origem deixa de ter acesso. O solicitante continua consultando o chamado, e o encaminhamento fica registrado na auditoria (ASR01).
 
 ### ASR03 — Confiabilidade das notificações
 
