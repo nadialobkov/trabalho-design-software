@@ -23,6 +23,10 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
     request threads and from the scheduler thread at the same time.
     """
 
+    # How long a notification stays reserved for the instance sending it.
+    # Much longer than one send (SMTP timeout is 10 s).
+    RESERVA = "5 minutes"
+
     def __init__(self, url: str) -> None:
         self.url = url
 
@@ -133,14 +137,18 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
 
             if notificacao is not None:
                 if notificacao.id is None:
+                    # Without text yet, it starts reserved, so the scheduler does
+                    # not take it before atualizar_notificacao() writes the text.
                     cur.execute(
-                        "INSERT INTO notificacao"
-                        " (chamado_id, destinatario, assunto, mensagem, status, tentativas)"
-                        " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                        "INSERT INTO notificacao (chamado_id, destinatario, assunto,"
+                        " mensagem, status, tentativas, reservada_ate)"
+                        " VALUES (%s, %s, %s, %s, %s, %s,"
+                        f" CASE WHEN %s = '' THEN now() + interval '{self.RESERVA}' END)"
+                        " RETURNING id",
                         (
                             chamado.id, notificacao.destinatario, notificacao.assunto,
                             notificacao.mensagem, str(notificacao.status),
-                            notificacao.tentativas,
+                            notificacao.tentativas, notificacao.assunto,
                         ),
                     )
                     notificacao.id = cur.fetchone()["id"]
@@ -190,8 +198,20 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
             ]
 
     def listar_pendentes(self) -> list[Notificacao]:
+        # Reserves the rows it returns, so two app instances on the same database
+        # never send the same e-mail. SKIP LOCKED: rows another instance is
+        # reserving right now are left out instead of waited for.
+        # atualizar_notificacao() frees the row again.
         with self._conectar() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM notificacao WHERE status = 'PENDENTE' ORDER BY id")
+            cur.execute(
+                f"UPDATE notificacao SET reservada_ate = now() + interval '{self.RESERVA}'"
+                " WHERE id IN ("
+                "   SELECT id FROM notificacao WHERE status = 'PENDENTE'"
+                "   AND (reservada_ate IS NULL OR reservada_ate < now())"
+                "   ORDER BY id FOR UPDATE SKIP LOCKED"
+                ") RETURNING *"
+            )
+            linhas = sorted(cur.fetchall(), key=lambda linha: linha["id"])
             return [
                 Notificacao(
                     chamado=self._carregar_chamado(cur, linha["chamado_id"]),
@@ -202,7 +222,7 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
                     tentativas=linha["tentativas"],
                     id=linha["id"],
                 )
-                for linha in cur.fetchall()
+                for linha in linhas
             ]
 
     def atualizar_notificacao(self, notificacao: Notificacao) -> None:
@@ -216,7 +236,8 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
     @staticmethod
     def _atualizar_notificacao(cur: Cursor, notificacao: Notificacao) -> None:
         cur.execute(
-            "UPDATE notificacao SET assunto = %s, mensagem = %s, status = %s, tentativas = %s"
+            "UPDATE notificacao SET assunto = %s, mensagem = %s, status = %s, tentativas = %s,"
+            " reservada_ate = NULL"  # done with it: free it for the next round
             " WHERE id = %s",
             (
                 notificacao.assunto, notificacao.mensagem, str(notificacao.status),

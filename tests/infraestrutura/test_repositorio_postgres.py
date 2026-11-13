@@ -124,3 +124,40 @@ def test_audit_rows_cannot_be_changed(
 
     with psycopg.connect(URL) as conn, pytest.raises(psycopg.errors.RaiseException):
         conn.execute("UPDATE registro_auditoria SET valor_novo = 'X'")
+
+
+def test_two_instances_never_get_the_same_pending_notification(
+    service: ManutencaoService, repo: PostgresManutencaoRepositorio,
+) -> None:
+    service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
+    other_instance = PostgresManutencaoRepositorio(URL)
+
+    [notification] = repo.listar_pendentes()
+    assert other_instance.listar_pendentes() == []
+
+    # A failed send keeps it pending and frees it for the next round.
+    notification.registrar_falha()
+    repo.atualizar_notificacao(notification)
+    assert [n.id for n in other_instance.listar_pendentes()] == [notification.id]
+
+
+def test_notification_without_text_waits_for_its_text(
+    service: ManutencaoService, repo: PostgresManutencaoRepositorio,
+) -> None:
+    # Between the two steps of abrir_chamado() the scheduler must not take it.
+    ticket = service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
+    notification = Notificacao(ticket, destinatario="ana@example.com")
+    repo.salvar_chamado(ticket, RegistroAuditoria(
+        ticket, ticket.solicitante, datetime(2026, 11, 13), campo="estado",
+        valor_anterior=None, valor_novo="ABERTO",
+    ), notification)
+    assert notification.id not in [n.id for n in repo.listar_pendentes()]
+
+    # If the app stopped there, the row is free again once the reservation ends.
+    with psycopg.connect(URL) as conn:
+        conn.execute(
+            "UPDATE notificacao SET reservada_ate = now() - interval '1 second' WHERE id = %s",
+            (notification.id,),
+        )
+    [stuck] = repo.listar_pendentes()
+    assert (stuck.id, stuck.assunto) == (notification.id, "")

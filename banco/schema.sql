@@ -84,7 +84,11 @@ CREATE TABLE notificacao (
     mensagem     TEXT NOT NULL DEFAULT '',
     status       TEXT NOT NULL
         CHECK (status IN ('PENDENTE', 'ENVIADA', 'FALHOU')),
-    tentativas   INTEGER NOT NULL DEFAULT 0
+    tentativas   INTEGER NOT NULL DEFAULT 0,
+    -- While in the future, one app instance is sending this row, so the others
+    -- skip it (no duplicate e-mail). NULL = free. If that instance stops, the
+    -- row is free again when the time passes.
+    reservada_ate TIMESTAMPTZ
 );
 
 CREATE INDEX notificacao_pendente ON notificacao (id) WHERE status = 'PENDENTE';

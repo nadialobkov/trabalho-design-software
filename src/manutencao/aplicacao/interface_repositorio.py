@@ -49,6 +49,12 @@ class ManutencaoRepositorio(ABC):
 
     @abstractmethod
     def listar_pendentes(self) -> list[Notificacao]:
+        """PENDENTE notifications to send now.
+
+        An implementation shared by several app instances may reserve the
+        returned ones, so no other instance gets them until
+        atualizar_notificacao() is called (no duplicate e-mail).
+        """
         ...
 
     @abstractmethod
