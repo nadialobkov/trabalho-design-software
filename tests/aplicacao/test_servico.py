@@ -56,7 +56,16 @@ def test_open_ticket_saves_audit_and_pending_confirmation(
     assert notification.tentativas == 0
     assert notification.assunto == f"Chamado #{ticket.id} registrado"
     assert notification.mensagem == (
-        f"Seu chamado #{ticket.id} para o equipamento Microscópio foi registrado."
+        "Olá, Ana.\n"
+        "\n"
+        f"Seu chamado #{ticket.id} foi registrado.\n"
+        "\n"
+        "Equipamento: Microscópio (Laboratório de Biologia)\n"
+        "Problema: Will not turn on\n"
+        "Data da ocorrência: 10/11/2026\n"
+        "Informações adicionais: Power cable checked\n"
+        f"Aberto em: {ticket.data_abertura:%d/%m/%Y %H:%M}\n"
+        "Estado: Aberto\n"
     )
 
 
@@ -127,18 +136,22 @@ def test_send_failure_keeps_notification_pending_until_retry_limit(
     assert notifier.enviadas == []
 
 
-def test_resend_skips_notification_without_text(
+def test_resend_rebuilds_notification_without_text(
     service: ManutencaoService, repo: RepositorioEmMemoria, notifier: NotificadorFake
 ) -> None:
-    service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
+    # Simulates the app stopping between saving the ticket and writing the text.
+    ticket = service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
     [notification] = repo.listar_pendentes()
+    texto_original = notification.mensagem
     notification.assunto = ""
+    notification.mensagem = ""
 
     service.reenviar_notificacoes()
 
-    assert notifier.enviadas == []
-    assert notification.status == Notificacao.Status.PENDENTE
-    assert notification.tentativas == 0
+    assert notifier.enviadas == [notification]
+    assert notification.assunto == f"Chamado #{ticket.id} registrado"
+    assert notification.mensagem == texto_original
+    assert notification.status == Notificacao.Status.ENVIADA
 
 
 def test_requester_sees_own_tickets_without_changing_filters(
