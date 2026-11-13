@@ -1,6 +1,8 @@
 # Diagrama de classes
 
-Classes marcadas com **★** são implementadas no protótipo (UC01 registrar chamado, UC02 consultar chamados e UC09 reenviar notificações). As outras existem só no projeto.
+O protótipo implementa o UC01 (registrar chamado), o UC02 (consultar chamados) e o UC09 (reenviar notificações). O diagrama mostra o projeto completo, com os 9 casos de uso. Um **◇** antes de um método quer dizer que ele é só projeto (UC03–UC08) e ainda não existe no código.
+
+As telas React (`TelaAbrirChamado`, `TelaListaChamados`) ainda não existem; por enquanto a API é usada pela página `/docs`.
 
 ## Como ler
 
@@ -31,43 +33,43 @@ classDiagram
     direction LR
 
     namespace Apresentacao {
-        class TelaAbrirChamado["★ TelaAbrirChamado"] {
+        class TelaAbrirChamado {
             <<React>>
         }
-        class TelaListaChamados["★ TelaListaChamados"] {
+        class TelaListaChamados {
             <<React>>
         }
-        class ManutencaoController["★ ManutencaoController"] {
+        class ManutencaoController {
             +post_chamados()
             +get_chamados()
-            +patch_prioridade()
-            +post_tecnicos()
-            +post_iniciar()
-            +post_concluir()
-            +post_encaminhar()
-            +get_historico()
+            ◇ +patch_prioridade()
+            ◇ +post_tecnicos()
+            ◇ +post_iniciar()
+            ◇ +post_concluir()
+            ◇ +post_encaminhar()
+            ◇ +get_historico()
         }
-        class AgendadorNotificacoes["★ AgendadorNotificacoes"] {
+        class AgendadorNotificacoes {
             +executar()
             +rodar()
         }
     }
 
     namespace Aplicacao {
-        class ManutencaoService["★ ManutencaoService"] {
+        class ManutencaoService {
             +abrir_chamado()
             +consultar_chamados()
-            +definir_prioridade()
-            +atribuir_tecnico()
-            +iniciar_atendimento()
-            +concluir_chamado()
-            +consultar_historico()
-            +encaminhar_chamado()
+            ◇ +definir_prioridade()
+            ◇ +atribuir_tecnico()
+            ◇ +iniciar_atendimento()
+            ◇ +concluir_chamado()
+            ◇ +consultar_historico()
+            ◇ +encaminhar_chamado()
             +reenviar_notificacoes()
             -verificar_permissao()
             -preencher_confirmacao()
         }
-        class ManutencaoRepositorio["★ ManutencaoRepositorio"] {
+        class ManutencaoRepositorio {
             <<interface>>
             +buscar_chamado()
             +listar_chamados()
@@ -80,14 +82,14 @@ classDiagram
             +listar_pendentes()
             +atualizar_notificacao()
         }
-        class Notificador["★ Notificador"] {
+        class Notificador {
             <<interface>>
             +enviar()
         }
     }
 
     namespace Dominio {
-        class Chamado["★ Chamado"] {
+        class Chamado {
             +Estado
             +Prioridade
             +equipamento
@@ -106,18 +108,18 @@ classDiagram
             +concluido_por
             +data_conclusao
             +abrir()$
-            +definir_prioridade()
-            +atribuir_tecnico()
-            +iniciar_atendimento()
-            +concluir()
-            +encaminhar()
+            ◇ +definir_prioridade()
+            ◇ +atribuir_tecnico()
+            ◇ +iniciar_atendimento()
+            ◇ +concluir()
+            ◇ +encaminhar()
         }
-        class Equipamento["★ Equipamento"] {
+        class Equipamento {
             +nome
             +laboratorio
             +departamento
         }
-        class Usuario["★ Usuario"] {
+        class Usuario {
             +Papel
             +nome
             +email
@@ -129,7 +131,7 @@ classDiagram
         class Departamento {
             +nome
         }
-        class Notificacao["★ Notificacao"] {
+        class Notificacao {
             +Status
             +MAX_TENTATIVAS$
             +chamado
@@ -141,7 +143,7 @@ classDiagram
             +marcar_enviada()
             +registrar_falha()
         }
-        class RegistroAuditoria["★ RegistroAuditoria"] {
+        class RegistroAuditoria {
             +chamado
             +autor
             +data_hora
@@ -153,12 +155,12 @@ classDiagram
     }
 
     namespace Infraestrutura {
-        class PostgresManutencaoRepositorio["★ PostgresManutencaoRepositorio"]
-        class RepositorioEmMemoria["★ RepositorioEmMemoria"]
-        class SmtpNotificador["★ SmtpNotificador"] {
+        class PostgresManutencaoRepositorio
+        class RepositorioEmMemoria
+        class SmtpNotificador {
             +enviar()
         }
-        class NotificadorFake["★ NotificadorFake"] {
+        class NotificadorFake {
             +enviar()
         }
     }
@@ -188,17 +190,18 @@ classDiagram
 ## Notas
 
 - **Nomes sem acento** nos grupos (`Apresentacao`, `Aplicacao`, `Dominio`): o Mermaid não aceita acento nesses nomes.
+- **O `id` não aparece no diagrama.** `Chamado`, `Equipamento`, `Usuario`, `Departamento`, `Notificacao` e `RegistroAuditoria` têm um atributo `id` no código.
 - **Três ligações aparecem só como atributo**, para o diagrama caber numa tela: `Usuario.departamento` e `Equipamento.departamento` (apontam para um `Departamento`) e `RegistroAuditoria.autor` (aponta para um `Usuario`).
 - **Departamento do chamado:** na abertura, o chamado recebe o departamento do equipamento (`Equipamento.departamento`).
-- **`RepositorioEmMemoria`** guarda os dados em listas. É usado nos testes e para rodar a API sem banco. Ele e o `PostgresManutencaoRepositorio` implementam a mesma interface, então trocar um pelo outro não muda o service.
+- **`RepositorioEmMemoria`** guarda os dados na memória do processo. É usado nos testes e para rodar a API sem banco. Ele e o `PostgresManutencaoRepositorio` implementam a mesma interface, então trocar um pelo outro não muda o service.
 - **Classes de apoio do protótipo** (fora do desenho, para ele caber numa tela):
   - `FiltrosChamado` (Aplicação) agrupa os filtros do UC02.
   - Dois erros na Aplicação: `AcessoNegado` (usuário ausente, desconhecido ou sem permissão; ASR02 → HTTP 403) e `EquipamentoNaoEncontrado` (RN01 → HTTP 404).
   - Os outros erros usam classes prontas do Python: o domínio lança `ValueError` para dado inválido (HTTP 422), e um `Notificador` lança `OSError` quando o envio falha (o service captura; ASR03).
-  - Dois esquemas Pydantic no controller: `AbrirChamadoRequisicao` (corpo do POST) e `ChamadoResposta` (resposta do POST e do GET).
+  - Dois esquemas Pydantic em `aapresentacao/esquemas.py`: `AbrirChamadoRequisicao` (corpo do POST) e `ChamadoResposta` (resposta do POST e do GET). A função `para_resposta()` converte um `Chamado` em `ChamadoResposta`.
 - **Layout ELK:** o arquivo pede o layout `elk`, que deixa o desenho compacto. Onde o ELK não existe (provavelmente no GitHub), o Mermaid usa o layout padrão: o conteúdo é o mesmo, mas o desenho fica maior.
 - **`ManutencaoService` coordena os 9 casos de uso.** Ele só coordena os passos (verificar permissão, buscar, chamar o domínio, salvar, notificar). As regras ficam no Domínio.
-- **`verificar_permissao()`** é um método privado do service, chamado no início de cada caso de uso (ASR02).
+- **`verificar_permissao()`** é um método privado do service, chamado no início de cada caso de uso (ASR02). No protótipo, ele recusa usuário desconhecido e ações fora de `abrir` e `consultar`. O filtro por papel do UC02 fica em `consultar_chamados()`: o solicitante vê só os próprios chamados; técnico e coordenador veem só os do seu departamento.
 - **`salvar_chamado(chamado, auditoria, notificacao)`** grava as três coisas numa **única transação** do banco: ou salva tudo, ou nada (ASR01 e ASR03).
 - **Envio assíncrono do e-mail (ASR03, RF08):** `abrir_chamado()` não envia nada. Ele salva a notificação como `PENDENTE`, e a lista de pendentes funciona como uma **fila salva no banco**. O `AgendadorNotificacoes` chama `reenviar_notificacoes()` a cada 10 s, que tenta enviar cada pendente. Se o servidor de e-mail cair, nada se perde: a notificação continua na fila e é tentada de novo. Depois de `Notificacao.MAX_TENTATIVAS` (5) falhas, ela vira `FALHOU`.
   - O texto do e-mail é escrito por `preencher_confirmacao()`, um método privado do service. Se a aplicação parar depois de salvar o chamado e antes de escrever o texto, `reenviar_notificacoes()` escreve o texto a partir do chamado e envia normalmente; assim a notificação não fica presa como `PENDENTE`.
@@ -210,17 +213,17 @@ classDiagram
 
 | UC | Rota (`ManutencaoController`) | Método (`ManutencaoService`) | Recebe | Requisito | Protótipo |
 |---|---|---|---|---|---|
-| UC01 | `post_chamados()` | `abrir_chamado()` | usuario_id, equipamento_id, descricao_problema, data_ocorrencia, informacoes_adicionais → `Chamado` | RF01, RF08, RN01 | ★ |
-| UC02 | `get_chamados()` | `consultar_chamados()` | usuario_id, filtros (`FiltrosChamado`) → lista de `Chamado` | RF02, RF03 | ★ |
+| UC01 | `post_chamados()` | `abrir_chamado()` | usuario_id, equipamento_id, descricao_problema, data_ocorrencia, informacoes_adicionais → `Chamado` | RF01, RF08, RN01 | Sim |
+| UC02 | `get_chamados()` | `consultar_chamados()` | usuario_id, filtros (`FiltrosChamado`) → lista de `Chamado` | RF02, RF03 | Sim |
 | UC03 | `patch_prioridade()` | `definir_prioridade()` | usuario_id, chamado_id, prioridade | RF04 | |
 | UC04 | `post_tecnicos()` | `atribuir_tecnico()` | usuario_id, chamado_id, tecnico_id | RF05, RN02 | |
 | UC05 | `post_iniciar()` | `iniciar_atendimento()` | usuario_id, chamado_id | RF10 | |
 | UC06 | `post_concluir()` | `concluir_chamado()` | usuario_id, chamado_id, diagnostico, descricao_intervencao | RF07, RF08 | |
 | UC07 | `get_historico()` | `consultar_historico()` | usuario_id, equipamento_id → lista de `Chamado` | RF06 | |
 | UC08 | `post_encaminhar()` | `encaminhar_chamado()` | usuario_id, chamado_id, departamento_id, justificativa | RF09 | |
-| UC09 | — (`AgendadorNotificacoes.executar()`) | `reenviar_notificacoes()` | nada | RF08, ASR03 | ★ |
-| — | — | `verificar_permissao()` | usuario_id, acao → `Usuario` | ASR02 | ★ |
-| — | — | `preencher_confirmacao()` | notificacao (escreve assunto e mensagem) | RF08, ASR03 | ★ |
+| UC09 | — (`AgendadorNotificacoes.executar()`) | `reenviar_notificacoes()` | nada | RF08, ASR03 | Sim |
+| — | — | `verificar_permissao()` | usuario_id, acao → `Usuario` | ASR02 | Sim |
+| — | — | `preencher_confirmacao()` | notificacao (escreve assunto e mensagem) | RF08, ASR03 | Sim |
 
 ## Tipos com valores fixos (enumerações)
 
@@ -238,12 +241,12 @@ As enumerações são tipos aninhados nas classes do domínio, sem um arquivo
 
 | Classe / método | Regra | Requisito |
 |---|---|---|
-| `Chamado.abrir()` | Nasce no estado `ABERTO`, com a data de abertura | RF01 |
-| `Chamado.atribuir_tecnico()` | Recusa quem não é técnico; passa de `ABERTO` para `ATRIBUIDO` | RF05, RN02, RN03 |
-| `Chamado.iniciar_atendimento()` | Só o técnico atribuído; só a partir de `ATRIBUIDO` | RF10, RN03 |
-| `Chamado.concluir()` | Exige o diagnóstico e a descrição da intervenção; só a partir de `EM_ATENDIMENTO` | RF07, RN03 |
-| `Chamado.encaminhar()` | Troca o departamento responsável | RF09 |
-| `Usuario.e_tecnico()` / `e_coordenador_de()` | Informa o papel, usado em `verificar_permissao()` | RN02, ASR02 |
+| `Chamado.abrir()` | Recusa descrição vazia; nasce no estado `ABERTO`, com a data de abertura e o departamento do equipamento | RF01 |
+| ◇ `Chamado.atribuir_tecnico()` | Recusa quem não é técnico; passa de `ABERTO` para `ATRIBUIDO` | RF05, RN02, RN03 |
+| ◇ `Chamado.iniciar_atendimento()` | Só o técnico atribuído; só a partir de `ATRIBUIDO` | RF10, RN03 |
+| ◇ `Chamado.concluir()` | Exige o diagnóstico e a descrição da intervenção; só a partir de `EM_ATENDIMENTO` | RF07, RN03 |
+| ◇ `Chamado.encaminhar()` | Troca o departamento responsável | RF09 |
+| `Usuario.e_tecnico()` / `e_coordenador_de()` | Informa o papel. Já existem no código, mas só serão usados por `verificar_permissao()` e `atribuir_tecnico()` nos UC03–UC08 | RN02, ASR02 |
 | `Notificacao.marcar_enviada()` / `registrar_falha()` | Atualiza o status e as tentativas; após `MAX_TENTATIVAS` falhas, `FALHOU` | ASR03 |
 
 `Equipamento`, `Departamento` e `RegistroAuditoria` são só dados. A justificativa do encaminhamento (RF09) fica em `RegistroAuditoria.observacao`.

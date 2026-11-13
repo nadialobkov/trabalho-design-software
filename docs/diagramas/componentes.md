@@ -2,7 +2,7 @@
 
 Arquitetura: **cliente-servidor + monólito + camadas**, com interfaces nas bordas (estilo hexagonal).
 
-Blocos com **borda grossa e ★** são implementados no protótipo (UC01 registrar chamado, UC02 consultar chamados e UC09 reenviar notificações). Os outros existem só no projeto.
+O protótipo implementa o UC01 (registrar chamado), o UC02 (consultar chamados) e o UC09 (reenviar notificações). O diagrama mostra o projeto completo. As telas React ainda não existem; por enquanto a API é usada pela página `/docs`.
 
 ## Como ler
 
@@ -31,27 +31,27 @@ config:
 ---
 flowchart TB
     subgraph NAV["Navegador (cliente)"]
-        UI["★ Telas React<br/>Abrir chamado · Lista de chamados"]
+        UI["Telas React<br/>Abrir chamado · Lista de chamados"]
     end
 
     subgraph SRV["Servidor: monólito"]
         subgraph APRES["Apresentação"]
-            CTRL["★ ManutencaoController<br/>rotas HTTP"]
-            AGE["★ AgendadorNotificacoes<br/>envia e-mails pendentes a cada 10 s"]
+            CTRL["ManutencaoController<br/>rotas HTTP"]
+            AGE["AgendadorNotificacoes<br/>envia e-mails pendentes a cada 10 s"]
         end
         subgraph APP["Aplicação"]
-            MS["★ ManutencaoService<br/>9 casos de uso + verificar permissão"]
-            IREPO["★ «interface»<br/>ManutencaoRepositorio"]
-            INOT["★ «interface»<br/>Notificador"]
+            MS["ManutencaoService<br/>9 casos de uso + verificar permissão"]
+            IREPO["«interface»<br/>ManutencaoRepositorio"]
+            INOT["«interface»<br/>Notificador"]
         end
         subgraph DOM["Domínio"]
-            DOMN["★ Entidades<br/>Chamado · Equipamento<br/>Usuario · Departamento<br/>Notificacao · RegistroAuditoria"]
+            DOMN["Entidades<br/>Chamado · Equipamento<br/>Usuario · Departamento<br/>Notificacao · RegistroAuditoria"]
         end
         subgraph INFRA["Infraestrutura"]
-            PG["★ PostgresManutencaoRepositorio"]
-            MEM["★ RepositorioEmMemoria<br/>(testes, sem banco)"]
-            SMTPN["★ SmtpNotificador"]
-            FAKE["★ NotificadorFake<br/>(testes)"]
+            PG["PostgresManutencaoRepositorio"]
+            MEM["RepositorioEmMemoria<br/>(testes, sem banco)"]
+            SMTPN["SmtpNotificador"]
+            FAKE["NotificadorFake<br/>(testes)"]
         end
     end
 
@@ -80,8 +80,6 @@ flowchart TB
     PG -->|SQL| DB
     SMTPN -->|SMTP| EMAIL
 
-    classDef impl stroke-width:3px
-    class UI,CTRL,AGE,MS,IREPO,INOT,DOMN,PG,MEM,SMTPN,FAKE impl
 ```
 
 ## Legenda
