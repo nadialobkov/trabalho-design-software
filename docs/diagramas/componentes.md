@@ -1,6 +1,6 @@
 # Diagrama de componentes
 
-Arquitetura: **cliente-servidor + monólito + camadas**, com interfaces nas bordas (estilo hexagonal).
+Arquitetura: **cliente-servidor + monólito + camadas**, com inversão de dependências por interfaces de persistência e notificação.
 
 O protótipo implementa o UC01 (registrar chamado), o UC02 (consultar chamados) e o UC09 (reenviar notificações). O diagrama mostra o projeto completo. As telas React ainda não existem; por enquanto a API é usada pela página `/docs`.
 
@@ -37,7 +37,7 @@ flowchart TB
     subgraph SRV["Servidor: monólito"]
         subgraph APRES["Apresentação"]
             CTRL["ManutencaoController<br/>rotas HTTP"]
-            AGE["AgendadorNotificacoes<br/>envia e-mails pendentes a cada 10 s"]
+            AGE["AgendadorNotificacoes<br/>aciona o processamento de pendências a cada 10 s"]
         end
         subgraph APP["Aplicação"]
             MS["ManutencaoService<br/>9 casos de uso + verificar permissão"]
@@ -85,7 +85,7 @@ flowchart TB
 ## Legenda
 
 - **Seta contínua (`-->`)**: "usa / chama".
-- **Seta tracejada (`-.->`) com "implementa"**: a Infraestrutura implementa a interface. Nenhuma camada de cima conhece a Infraestrutura.
+- **Seta tracejada (`-.->`) com "implementa"**: a Infraestrutura implementa a interface. O serviço de aplicação depende dos contratos, não das implementações concretas. O ponto de composição conecta as implementações na inicialização.
 - **A Infraestrutura também conhece o Domínio** (para salvar e montar os objetos). Essa seta foi omitida para o desenho ficar limpo.
 - **Links invisíveis (`~~~`)** no código só posicionam os blocos. Eles não são dependências.
 

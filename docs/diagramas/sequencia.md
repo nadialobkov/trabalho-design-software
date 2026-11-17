@@ -2,7 +2,7 @@
 
 ## 1. Caso de uso: concluir chamado
 
-O caso de uso **UC06 — Concluir chamado** representa a solicitação de um técnico para encerrar um atendimento, informando diagnóstico e descrição da intervenção realizada. O fluxo atende ao RF07 e prepara a comunicação de conclusão prevista no RF08.
+O caso de uso **UC06 — Concluir chamado** representa a solicitação de um técnico para encerrar um atendimento, informando diagnóstico e descrição da intervenção realizada. O fluxo descreve o comportamento projetado para o RF07 e prepara a comunicação de conclusão prevista no RF08. As operações UC06 marcadas como planejadas no diagrama de classes são representadas aqui como parte do projeto do sistema.
 
 A sequência apresenta a colaboração entre apresentação, aplicação, domínio e infraestrutura em uma aplicação monolítica. As chamadas internas são chamadas de métodos; HTTP é utilizado entre cliente e servidor, SQL na persistência e SMTP no envio externo.
 

@@ -173,6 +173,9 @@ classDiagram
     ManutencaoService --> ManutencaoRepositorio
     ManutencaoService --> Notificador
     ManutencaoService --> Chamado
+    ManutencaoService --> Usuario
+    ManutencaoService --> RegistroAuditoria
+    ManutencaoService --> Notificacao
     ManutencaoRepositorio ..> Chamado
 
     PostgresManutencaoRepositorio ..|> ManutencaoRepositorio
@@ -181,7 +184,9 @@ classDiagram
     NotificadorFake ..|> Notificador
 
     Chamado "*" --> "1" Equipamento
-    Chamado "*" --> "1..*" Usuario
+    Chamado "*" --> "1" Usuario : solicitante
+    Chamado "*" --> "0..*" Usuario : tecnicos
+    Chamado "*" --> "0..1" Usuario : concluido_por
     Chamado "*" --> "1" Departamento
     Chamado "1" <-- "*" Notificacao
     Chamado "1" <-- "*" RegistroAuditoria
@@ -189,9 +194,10 @@ classDiagram
 
 ## Notas
 
-- **Nomes sem acento** nos grupos (`Apresentacao`, `Aplicacao`, `Dominio`): o Mermaid não aceita acento nesses nomes.
+- **Nomes dos grupos:** os identificadores `Apresentacao`, `Aplicacao`, `Dominio` e `Infraestrutura` são escritos sem acento para manter a padronização.
 - **O `id` não aparece no diagrama.** `Chamado`, `Equipamento`, `Usuario`, `Departamento`, `Notificacao` e `RegistroAuditoria` têm um atributo `id` no código.
 - **Três ligações aparecem só como atributo**, para o diagrama caber numa tela: `Usuario.departamento` e `Equipamento.departamento` (apontam para um `Departamento`) e `RegistroAuditoria.autor` (aponta para um `Usuario`).
+- **Papéis nas associações:** cada chamado tem um solicitante, pode ter zero ou vários técnicos e possui no máximo um autor da conclusão. Antes da atribuição, a lista de técnicos pode estar vazia. O papel e a autorização dos usuários são verificados pelas regras de negócio, não pela multiplicidade UML.
 - **Departamento do chamado:** na abertura, o chamado recebe o departamento do equipamento (`Equipamento.departamento`).
 - **`RepositorioEmMemoria`** guarda os dados na memória do processo. É usado nos testes e para rodar a API sem banco. Ele e o `PostgresManutencaoRepositorio` implementam a mesma interface, então trocar um pelo outro não muda o service.
 - **Classes de apoio do protótipo** (fora do desenho, para ele caber numa tela):
@@ -200,12 +206,12 @@ classDiagram
   - Os outros erros usam classes prontas do Python: o domínio lança `ValueError` para dado inválido (HTTP 422), e um `Notificador` lança `OSError` quando o envio falha (o service captura; ASR03).
   - Dois esquemas Pydantic em `aapresentacao/esquemas.py`: `AbrirChamadoRequisicao` (corpo do POST) e `ChamadoResposta` (resposta do POST e do GET). A função `para_resposta()` converte um `Chamado` em `ChamadoResposta`.
 - **Layout ELK:** o arquivo pede o layout `elk`, que deixa o desenho compacto. Onde o ELK não existe (provavelmente no GitHub), o Mermaid usa o layout padrão: o conteúdo é o mesmo, mas o desenho fica maior.
-- **`ManutencaoService` coordena os 9 casos de uso.** Ele só coordena os passos (verificar permissão, buscar, chamar o domínio, salvar, notificar). As regras ficam no Domínio.
-- **`verificar_permissao()`** é um método privado do service, chamado no início de cada caso de uso (ASR02). No protótipo, ele recusa usuário desconhecido e ações fora de `abrir` e `consultar`. O filtro por papel do UC02 fica em `consultar_chamados()`: o solicitante vê só os próprios chamados; técnico e coordenador veem só os do seu departamento.
+- **`ManutencaoService` coordena os 9 casos de uso.** Ele coordena os passos (verificar permissão, buscar, chamar o domínio, salvar e notificar) e compõe a confirmação de abertura. As regras do ciclo de vida ficam no Domínio; as políticas de autorização e visibilidade são aplicadas pelo serviço.
+- **`verificar_permissao()`** é um método privado do service, utilizado nas operações solicitadas por usuários (ASR02). O UC09 é acionado pelo agendador e não representa uma solicitação de usuário. No protótipo, ele recusa usuário desconhecido e ações fora de `abrir` e `consultar`. O filtro por papel do UC02 fica em `consultar_chamados()`: o solicitante vê só os próprios chamados; técnico e coordenador veem só os do seu departamento.
 - **`salvar_chamado(chamado, auditoria, notificacao)`** grava as três coisas numa **única transação** do banco: ou salva tudo, ou nada (ASR01 e ASR03).
-- **Envio assíncrono do e-mail (ASR03, RF08):** `abrir_chamado()` não envia nada. Ele salva a notificação como `PENDENTE`, e a lista de pendentes funciona como uma **fila salva no banco**. O `AgendadorNotificacoes` chama `reenviar_notificacoes()` a cada 10 s, que tenta enviar cada pendente. Se o servidor de e-mail cair, nada se perde: a notificação continua na fila e é tentada de novo. Depois de `Notificacao.MAX_TENTATIVAS` (5) falhas, ela vira `FALHOU`.
+- **Envio assíncrono do e-mail (ASR03, RF08):** `abrir_chamado()` não envia nada. Ele salva a notificação como `PENDENTE`, e a lista de pendentes funciona como uma **fila salva no banco**. O `AgendadorNotificacoes` chama `reenviar_notificacoes()` a cada 10 s, que tenta enviar cada pendente. Se o envio falhar, a notificação permanece pendente enquanto não atingir `Notificacao.MAX_TENTATIVAS` (5). Ao atingir esse limite, passa para `FALHOU`, permanece armazenada e deixa de ser reenviada automaticamente. O fluxo não garante recuperação automática após indisponibilidade prolongada.
   - O texto do e-mail é escrito por `preencher_confirmacao()`, um método privado do service. Se a aplicação parar depois de salvar o chamado e antes de escrever o texto, `reenviar_notificacoes()` escreve o texto a partir do chamado e envia normalmente; assim a notificação não fica presa como `PENDENTE`.
-  - No PostgreSQL, uma notificação pode ficar **reservada** (coluna `reservada_ate`), e `listar_pendentes()` não devolve as reservadas. Uma notificação nova já nasce reservada até `abrir_chamado()` escrever o texto; assim o agendador não a envia no meio do caminho, o que geraria um e-mail repetido. `listar_pendentes()` também reserva o que devolve (`FOR UPDATE SKIP LOCKED`), então uma segunda instância da aplicação no mesmo banco não envia o mesmo e-mail. `atualizar_notificacao()` libera a reserva. Se a aplicação parar, a reserva vence em 5 minutos.
+  - No PostgreSQL, uma notificação pode ficar **reservada** (coluna `reservada_ate`), e `listar_pendentes()` não devolve as reservadas. Uma notificação nova já nasce reservada até `abrir_chamado()` escrever o texto; assim o agendador não a seleciona enquanto seu conteúdo está sendo preparado. `listar_pendentes()` também reserva o que devolve (`FOR UPDATE SKIP LOCKED`), reduzindo a seleção simultânea da mesma mensagem enquanto a reserva estiver válida. Uma falha após a aceitação pelo SMTP e antes da persistência do sucesso ainda pode causar reenvio; não há garantia de entrega exatamente uma vez. `atualizar_notificacao()` libera a reserva. Se a aplicação parar, a reserva vence em 5 minutos.
 - **Uma interface por arquivo:** `aplicacao/interface_repositorio.py` (`ManutencaoRepositorio`) e `aplicacao/interface_notificador.py` (`Notificador`). As duas ficam na Aplicação porque é ela que as usa; a Infraestrutura só as implementa (inversão de dependência).
 - **Fluxo de erro do protótipo:** se `buscar_equipamento()` não encontrar o equipamento, `abrir_chamado()` recusa o pedido (RN01) e o controller responde HTTP 404.
 
