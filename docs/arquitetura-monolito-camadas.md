@@ -180,13 +180,19 @@ Essa distribuição evita que a interface execute o processo inteiro e permite q
 
 O domínio não conhece banco de dados, HTTP ou serviço de e-mail. A aplicação utiliza `ManutencaoRepositorio` e `Notificador`, mantendo as dependências tecnológicas nas implementações de infraestrutura.
 
-Assim, uma mudança no mecanismo de persistência ou envio pode ser concentrada na implementação do contrato, desde que suas garantias sejam preservadas.
+Assim, uma mudança no mecanismo de persistência ou envio pode ser concentrada na implementação do contrato, desde que suas garantias sejam preservadas. Por exemplo, substituir o acesso ao PostgreSQL não exige alterar a regra que impede concluir um chamado sem diagnóstico e intervenção.
+
+As interfaces reduzem o acoplamento às tecnologias, mas não eliminam as dependências. O serviço continua dependendo das operações e garantias de `ManutencaoRepositorio`, de `Notificador` e das entidades do domínio. Alterar esses contratos ou o significado dos dados pode exigir mudanças no serviço. O objetivo é manter dependências explícitas e relacionadas ao negócio, evitando que detalhes de SQL e SMTP se propaguem pelos casos de uso.
 
 ### 5.4. High Cohesion — Alta coesão
 
 As responsabilidades são agrupadas por propósito: controller trata comunicação, serviço coordena operações, entidades mantêm regras e dados do negócio, repositório persiste e notificador envia mensagens.
 
-`ManutencaoService` concentra os casos de uso de manutenção e o processamento de notificações. Para preservar sua coesão, os detalhes de SQL e SMTP ficam fora dele, e as regras do ciclo de vida permanecem em `Chamado`.
+Os casos de uso foram reunidos em `ManutencaoService` porque pertencem ao mesmo processo de atendimento e compartilham informações e dependências de persistência e notificação. Para o escopo do trabalho, essa organização mantém a coordenação concentrada em um componente, sem introduzir serviços adicionais para cada operação.
+
+Essa proximidade não torna todas as responsabilidades igualmente coesas. A composição de mensagens e o processamento de notificações possuem motivos de alteração diferentes daqueles da abertura, atribuição e conclusão dos chamados. Sua presença no mesmo serviço reduz a coesão e é uma simplificação consciente. Os detalhes de SQL e SMTP ficam fora dele, e as regras do ciclo de vida permanecem em `Chamado`, limitando a concentração de responsabilidades.
+
+Se o conteúdo das mensagens ou as políticas de processamento passarem a evoluir de forma independente e frequente, essa será uma indicação concreta para separar tais responsabilidades. A avaliação da coesão considera a relação entre as tarefas e seus motivos de mudança, não apenas o número de métodos da classe.
 
 ### 5.5. Polymorphism, Indirection e Protected Variations
 
@@ -200,7 +206,9 @@ As interfaces oferecem uma indireção entre o caso de uso e a tecnologia, prote
 
 As responsabilidades são distribuídas entre comunicação, coordenação, regras de negócio, persistência e envio. Uma alteração em SQL pertence ao repositório, enquanto uma alteração na regra de conclusão pertence ao domínio.
 
-O serviço concentra a coordenação dos casos de uso e a composição da confirmação. Por reunir essas atividades, exige atenção aos diferentes motivos de alteração; a separação em camadas ajuda a limitar essa concentração, mas não significa que toda classe possua apenas uma responsabilidade estrita.
+O serviço concentra a coordenação dos casos de uso e a composição da confirmação. Uma mudança no texto do e-mail pode exigir sua alteração mesmo sem modificar o atendimento; uma mudança na política de autorização também pode afetá-lo sem alterar as mensagens. Esses são motivos distintos de mudança, portanto a aplicação de SRP nessa classe é parcial.
+
+Essa concentração é aceita para manter simples a coordenação no escopo do trabalho, conforme a análise de coesão. A separação entre entidade, serviço, repositório e notificador impede que essa simplificação também incorpore ao serviço as regras do ciclo de vida e os mecanismos de banco e comunicação. A existência de camadas, por si só, não garante responsabilidade única em todas as classes.
 
 ### 6.2. OCP — Princípio aberto/fechado
 
@@ -218,7 +226,11 @@ Compartilhar métodos com os mesmos nomes não basta: erros, efeitos e condiçõ
 
 A separação entre `Notificador` e `ManutencaoRepositorio` distingue comunicação e persistência. `Notificador` possui uma operação específica de envio.
 
-`ManutencaoRepositorio` é mais abrangente e reúne operações de diferentes entidades utilizadas pelo serviço. Portanto, a segregação é aplicada por tipo de dependência, sem divisão fina das consultas e gravações por consumidor. Essa característica deve ser considerada ao avaliar o tamanho e a evolução do contrato.
+`ManutencaoRepositorio` é mais abrangente e reúne operações de diferentes entidades utilizadas pelo serviço. A escolha mantém um único contrato de persistência para coordenar o atendimento e explicita a gravação conjunta de chamado, auditoria e notificação. É uma organização simples para o consumidor principal, `ManutencaoService`.
+
+Entretanto, o processamento de notificações precisa apenas de parte dessas operações e recebe acesso a um contrato mais amplo. Portanto, a segregação ocorre por tipo de dependência, sem uma divisão fina por consumidor. A escolha não representa atendimento integral ao ISP.
+
+Se surgirem consumidores com necessidades independentes, contratos menores de consulta ou processamento de notificações poderão evitar dependências desnecessárias. Essa divisão não precisa eliminar a gravação atômica: interfaces diferentes podem compartilhar a mesma implementação e o mesmo mecanismo transacional. Assim, a abrangência atual é justificada pela simplicidade da coordenação, e não por uma exigência técnica do banco.
 
 ### 6.5. DIP — Princípio da inversão de dependências
 
