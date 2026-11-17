@@ -1,253 +1,227 @@
-# Arquitetura do sistema
+# Arquitetura do Sistema de Manutenção de Equipamentos de Laboratório
 
-## 1. Visão geral
+## 1. Contexto
 
-O Sistema de Manutenção de Equipamentos de Laboratório organiza o atendimento de solicitações da universidade, desde a abertura do chamado até a conclusão da manutenção. A solução permite consultar chamados, definir prioridades, atribuir técnicos, registrar intervenções, encaminhar atendimentos entre departamentos e preservar o histórico dos equipamentos.
+A manutenção dos equipamentos de laboratório envolve solicitantes, técnicos e coordenadores de diferentes departamentos da universidade. Sem um registro centralizado, a comunicação sobre problemas fica dispersa, o acompanhamento dos atendimentos se torna difícil e informações sobre soluções anteriores podem ser perdidas.
 
-A arquitetura escolhida combina **cliente-servidor, monólito modular, organização em camadas e API REST**. As integrações com persistência e envio de notificações utilizam interfaces, seguindo o princípio da inversão de dependências e características de portas e adaptadores.
+O sistema organiza esse processo por meio de chamados associados a equipamentos existentes. Solicitantes registram problemas e acompanham seus pedidos; coordenadores consultam demandas, classificam prioridades, atribuem técnicos e encaminham chamados; técnicos iniciam o atendimento, registram diagnóstico e intervenção e concluem a manutenção.
 
-A escolha atende a três preocupações centrais:
+Além das funcionalidades, três requisitos orientam a organização da solução:
 
-- **Rastreabilidade:** preservar quem realizou cada alteração, quando ela ocorreu e quais informações foram modificadas.
-- **Controle de acesso:** autorizar operações conforme o papel do usuário, seu vínculo departamental e sua relação com o chamado.
-- **Confiabilidade das notificações:** manter o atendimento registrado mesmo quando o serviço de comunicação estiver indisponível.
+- **Rastreabilidade:** preservar o responsável, o momento e os dados de cada alteração relevante, permitindo reconstruir o histórico do atendimento.
+- **Controle de acesso:** verificar permissões conforme o papel do usuário, seu departamento e sua relação com o chamado.
+- **Confiabilidade das notificações:** preservar a abertura ou conclusão do chamado mesmo quando o serviço de e-mail estiver indisponível.
 
-A solução privilegia uma implantação simples, transações locais e separação de responsabilidades. As decisões são orientadas pelos [requisitos e ASRs](requisitos.md).
+A arquitetura deve tornar essas responsabilidades explícitas e permitir a substituição de tecnologias de persistência e comunicação sem espalhar alterações pelas regras de negócio.
 
-## 2. Estilos arquiteturais e justificativas
+## 2. Arquitetura proposta e justificativas
 
-### 2.1. Cliente-servidor
+A solução adota **monólito + cliente-servidor + organização em quatro camadas: apresentação, aplicação, domínio e infraestrutura**.
 
-Os usuários acessam a aplicação por um cliente web, que envia requisições HTTP e recebe respostas JSON. O servidor executa os casos de uso, aplica as regras de autorização e acessa a persistência. O cliente não acessa diretamente o banco de dados.
+### 2.1. Monólito
 
-Essa organização centraliza as informações dos laboratórios e permite que solicitantes, técnicos e coordenadores compartilhem uma visão consistente dos atendimentos. Também concentra a aplicação das permissões no servidor: uma operação deve ser validada mesmo quando solicitada diretamente pela API.
+O backend reúne as funcionalidades em uma única aplicação Python, implantada como uma unidade. Os componentes colaboram por chamadas internas e utilizam um banco de dados compartilhado.
 
-A API permite acrescentar outros clientes, como um aplicativo mobile, reutilizando os mesmos casos de uso e regras de negócio.
+Essa escolha mantém simples a execução e a configuração do sistema e permite utilizar transações locais. Uma operação como concluir um chamado precisa salvar a alteração do atendimento, o registro de auditoria e a notificação pendente de forma conjunta. A aplicação única e o banco compartilhado facilitam essa garantia: a gravação é confirmada integralmente ou revertida em caso de falha.
 
-### 2.2. Monólito modular
+A organização monolítica é adequada ao escopo do trabalho porque permite concentrar o esforço nas regras, responsabilidades e consistência dos dados. A separação interna em camadas mantém o código organizado sem exigir comunicação remota entre suas partes.
 
-O backend é uma única aplicação, com implantação conjunta e módulos organizados por capacidades de negócio. Cada módulo possui responsabilidades definidas e expõe operações para colaboração com os demais. Os detalhes internos de um módulo não devem ser acessados diretamente por outro.
+PostgreSQL e o servidor de e-mail são dependências externas. Sua execução em processos ou contêineres separados não muda a classificação do backend, que continua sendo uma aplicação monolítica.
 
-A implantação única reduz a complexidade operacional e permite utilizar transações locais para salvar alterações de chamados, auditoria e notificações. Essa característica é especialmente relevante para a rastreabilidade e a consistência do atendimento.
+### 2.2. Cliente-servidor
 
-A modularização limita a propagação de mudanças. Uma alteração no processamento de notificações, por exemplo, deve permanecer concentrada nos componentes responsáveis por essa capacidade, preservando as regras do ciclo de vida dos chamados.
+Os usuários acessam um cliente web, responsável por apresentar informações e enviar solicitações HTTP com dados em JSON. O servidor recebe essas solicitações, verifica permissões, executa os casos de uso e acessa a persistência.
 
-O banco de dados compartilhado é uma escolha de persistência e não elimina os limites lógicos entre módulos. O acesso aos dados deve respeitar os contratos e as responsabilidades definidos, evitando que um módulo altere diretamente tabelas pertencentes a outro.
+A centralização permite compartilhar os dados entre laboratórios e departamentos. Todos os clientes consultam o mesmo conjunto de chamados, evitando históricos isolados em computadores diferentes.
+
+O servidor também concentra a autorização. A permissão para consultar, atribuir ou concluir um chamado deve ser verificada mesmo quando a operação é solicitada diretamente pela API. Os controles da interface ajudam o usuário, mas não substituem essa verificação.
+
+A API permite acrescentar outras interfaces, como um aplicativo mobile, reutilizando os serviços de aplicação e as regras do domínio. A comunicação é implementada com FastAPI, e as telas web utilizam React.
 
 ### 2.3. Organização em camadas
 
-As responsabilidades são distribuídas em quatro camadas: apresentação, aplicação, domínio e infraestrutura. Essa organização é aplicada aos módulos conforme a necessidade de cada um.
+As quatro camadas separam responsabilidades que possuem motivos diferentes para mudar:
 
-A separação distingue a forma de receber uma solicitação, a coordenação do caso de uso, as regras de negócio e os mecanismos técnicos. Dessa maneira, alterações em HTTP, SQL ou SMTP não precisam modificar as regras de manutenção.
-
-### 2.4. Portas e adaptadores
-
-Os casos de uso acessam persistência e comunicação externa por interfaces. As implementações concretas ficam na infraestrutura.
-
-As interfaces funcionam como portas, enquanto os componentes de PostgreSQL e SMTP funcionam como adaptadores. A API e o agendador são adaptadores de entrada: ambos acionam casos de uso, por requisição de usuário ou pelo relógio.
-
-Essa decisão permite substituir integrações e utilizar implementações simuladas nos testes, sem incorporar detalhes técnicos ao domínio.
-
-## 3. Módulos e responsabilidades
-
-| Módulo | Responsabilidades | Contratos de colaboração |
+| Camada | Responsabilidade principal | Justificativa |
 |---|---|---|
-| **Chamados e manutenção** | Abertura, prioridade, atribuição de técnicos, início, intervenções, encaminhamento, conclusão e histórico do atendimento | Recebe operações de atendimento; consulta equipamentos e vínculos; solicita registro de auditoria e notificações |
-| **Equipamentos** | Identificação patrimonial, descrição, localização e departamento dos equipamentos | Disponibiliza consulta de equipamentos existentes e seus dados |
-| **Usuários e departamentos** | Usuários, departamentos, funções e vínculos que fundamentam a autorização | Disponibiliza informações de identidade de negócio e vínculos departamentais |
-| **Notificações** | Comunicações pendentes, conteúdo, destinatários, tentativas e resultado da entrega | Recebe solicitações de comunicação e disponibiliza processamento de pendências |
+| **Apresentação** | Receber solicitações, validar sua estrutura e apresentar resultados | Alterações em rotas, parâmetros e formato das respostas ficam separadas das regras de manutenção |
+| **Aplicação** | Coordenar casos de uso e verificar permissões | A sequência de cada operação fica centralizada e pode ser acionada por diferentes interfaces |
+| **Domínio** | Representar os conceitos e validar as regras do atendimento | As regras permanecem próximas das informações necessárias e independentes de tecnologias externas |
+| **Infraestrutura** | Persistir dados e realizar comunicação externa | SQL e SMTP ficam concentrados nos componentes que conhecem essas tecnologias |
 
-A auditoria é uma responsabilidade transversal associada às operações que modificam o atendimento. Seu registro participa da mesma transação da alteração relevante, evitando que uma mudança seja confirmada sem o histórico correspondente.
+As camadas são divisões lógicas dentro da mesma aplicação. A comunicação entre elas ocorre por chamadas de métodos.
 
-A colaboração entre módulos ocorre por chamadas internas a contratos de aplicação. Não são necessárias chamadas HTTP entre módulos do mesmo backend. O módulo de chamados coordena o atendimento; notificações não alteram o estado dos chamados, e equipamentos não dependem do processamento de mensagens.
+A apresentação utiliza os serviços de aplicação. A aplicação utiliza entidades do domínio e interfaces de persistência e notificação. A infraestrutura implementa essas interfaces e conhece as entidades que precisa armazenar ou recuperar. O domínio não depende de HTTP, SQL ou SMTP.
 
-## 4. Camadas e direção das dependências
+A escolha das implementações concretas ocorre no ponto de inicialização, `main.py`, que conecta os componentes por seus construtores. Essa organização permite utilizar PostgreSQL ou memória e envio SMTP ou simulado sem alterar o fluxo principal dos casos de uso.
 
-| Camada | Responsabilidade | Exemplos |
-|---|---|---|
-| **Apresentação** | Receber solicitações, validar sua estrutura, converter respostas e erros e acionar casos de uso | Controllers HTTP, esquemas de entrada e saída e agendador |
-| **Aplicação** | Coordenar casos de uso, verificar autorização, recuperar entidades e definir a unidade transacional | Serviços de abertura, consulta, atribuição e conclusão; interfaces de persistência e notificação |
-| **Domínio** | Representar conceitos e proteger regras e invariantes do atendimento | Chamado, intervenção, atribuição de técnico, vínculos e regras de transição |
-| **Infraestrutura** | Implementar persistência e comunicação com tecnologias externas | Repositórios PostgreSQL, adaptador SMTP e implementações simuladas |
+### 2.4. Persistência e consistência
 
-O domínio não depende de HTTP, banco de dados ou serviço de e-mail. A aplicação depende do domínio e de abstrações. A infraestrutura implementa essas abstrações. A apresentação chama a aplicação e não executa SQL nem decide regras do ciclo de vida.
+O PostgreSQL armazena equipamentos, usuários, departamentos, chamados, associações de técnicos, auditoria e notificações. A natureza relacional desses dados e a necessidade de transações justificam sua utilização.
 
-```mermaid
-flowchart LR
-    P[Apresentação] --> A[Aplicação e contratos]
-    A --> D[Domínio]
-    I[Infraestrutura] --> A
-    I --> D
-```
+O acesso utiliza SQL com `psycopg`, concentrado em `PostgresManutencaoRepositorio`. O serviço de aplicação utiliza o contrato `ManutencaoRepositorio`, sem conhecer consultas ou conexões.
 
-As setas representam dependências de código. Em tempo de execução, a aplicação utiliza um objeto de infraestrutura por meio de sua interface, sem depender da classe concreta.
+A operação `salvar_chamado(chamado, auditoria, notificacao)` grava o chamado, suas associações, a auditoria e a notificação opcional na mesma transação. Isso evita confirmar uma alteração sem os registros necessários à rastreabilidade e ao processamento posterior da comunicação.
 
-Um ponto de composição conecta serviços, repositórios, notificadores e adaptadores de entrada. A escolha das implementações é feita na inicialização, por configuração, e as dependências são fornecidas aos componentes por seus construtores.
+Chaves estrangeiras e restrições de integridade complementam as validações do domínio. Os registros de auditoria são protegidos contra atualizações e exclusões comuns, preservando as informações produzidas pelas operações.
 
-## 5. Modelo de domínio e distribuição de responsabilidades
+O Docker Compose organiza a execução da aplicação, do banco e do Mailpit, utilizado como servidor de e-mail de demonstração. Um volume persistente mantém os dados entre reinícios.
 
-O modelo de domínio é orientado a objetos e reúne dados e comportamentos relacionados ao atendimento. As regras devem permanecer próximas dos conceitos que possuem as informações necessárias para aplicá-las.
+### 2.5. Notificações e autorização
 
-| Entidade | Responsabilidade |
+O envio de e-mail é separado da operação que modifica o chamado. A aplicação salva a notificação como pendente, e `AgendadorNotificacoes` aciona seu processamento a cada dez segundos. O serviço consulta as pendências, solicita o envio por `Notificador` e registra o resultado.
+
+Essa separação impede que a indisponibilidade do e-mail desfaça uma abertura ou conclusão já registrada. As pendências persistidas podem ser retomadas após reinício da aplicação.
+
+A política de envio prevê até cinco tentativas. Antes desse limite, uma falha mantém a notificação pendente; ao atingi-lo, ela passa para `FALHOU` e deixa de ser reenviada automaticamente. Essa política preserva o registro da falha, mas limita a recuperação automática a indisponibilidades superadas antes do esgotamento das tentativas.
+
+A autorização é verificada no serviço de aplicação com base no usuário identificado, seu papel, departamento e relação com o chamado. O solicitante consulta seus próprios chamados; técnicos e coordenadores consultam os chamados de seu departamento. Operações de atendimento exigem as permissões correspondentes, como a atribuição do técnico responsável pela conclusão. Identificar um usuário e verificar sua autorização são responsabilidades distintas da comprovação de sua identidade por autenticação.
+
+## 3. Modelo de domínio e responsabilidades
+
+O modelo de domínio é orientado a objetos e possui seis entidades principais. `Chamado` ocupa a posição central, pois representa a solicitação e reúne as informações necessárias ao acompanhamento do atendimento.
+
+| Entidade | Informações e responsabilidades |
 |---|---|
-| **Chamado** | Representar a solicitação, controlar seu ciclo de vida, definir prioridade e departamento responsável e validar operações de atendimento |
-| **Equipamento** | Identificar o equipamento, sua descrição, localização e vínculo departamental |
-| **Usuario** | Representar as pessoas que solicitam, executam ou coordenam atendimentos |
-| **Departamento** | Representar a unidade responsável pelo atendimento |
-| **VinculoDepartamento** | Associar usuário e departamento, incluindo função e autorização |
-| **AtribuicaoTecnico** | Registrar a participação de um técnico e seu período de responsabilidade, preservando atribuições anteriores |
-| **Intervencao** | Registrar diagnóstico, serviço executado, resultado, técnico e data da atividade |
-| **RegistroAuditoria** | Preservar autor, instante e informações anteriores e posteriores de uma alteração |
-| **Notificacao** | Representar conteúdo, destinatário, situação da entrega e tentativas de comunicação |
+| **Chamado** | Equipamento, solicitante, técnicos, departamento responsável, descrição do problema, informações adicionais, datas, prioridade e estado. Mantém diagnóstico, descrição da intervenção e responsável pela conclusão e valida as operações do ciclo de vida |
+| **Equipamento** | Identificação, nome, laboratório e departamento. Fornece a referência necessária para associar chamados e consultar seu histórico |
+| **Usuario** | Identificação, nome, e-mail, papel e departamento opcional. Informa se possui função de técnico ou de coordenador de determinado departamento |
+| **Departamento** | Identificação e nome da unidade responsável pelos atendimentos |
+| **RegistroAuditoria** | Chamado, autor, data e hora, campo alterado, valores anterior e novo e observação. Representa as alterações relevantes do atendimento |
+| **Notificacao** | Chamado, destinatário, assunto, mensagem, estado e tentativas. Controla o resultado do envio e o limite de falhas |
 
-Um equipamento pode possuir vários chamados. Um chamado pode reunir diversas atribuições e intervenções, permitindo registrar a participação de profissionais diferentes ao longo do atendimento.
+### 3.1. Relacionamentos
 
-O fluxo principal de estados é:
+Um equipamento pode estar associado a vários chamados, enquanto cada chamado se refere a um equipamento e a um solicitante. O chamado possui um departamento responsável e uma lista de técnicos, que pode estar vazia antes da atribuição.
+
+Na abertura, o departamento responsável é obtido do equipamento. O encaminhamento altera essa responsabilidade e deve produzir auditoria com a justificativa da transferência.
+
+Cada usuário possui um papel e um departamento opcional. As verificações utilizam essas informações diretamente. O diagnóstico e a descrição da intervenção são atributos do chamado, juntamente com o técnico que concluiu e a data de conclusão.
+
+Um chamado pode possuir vários registros de auditoria e notificações. A auditoria preserva as mudanças relevantes nos dados e nas associações de técnicos. O modelo não mantém atividades técnicas como uma coleção de intervenções independentes: a descrição da solução pertence ao chamado, e suas alterações relevantes devem ser registradas na auditoria.
+
+### 3.2. Regras do ciclo de vida
+
+O fluxo principal do atendimento é:
 
 ```text
 Aberto → Atribuído → Em atendimento → Concluído
 ```
 
-O chamado deve impedir transições inválidas, como a conclusão diretamente a partir do estado aberto. A conclusão exige diagnóstico e intervenção registrados, além da identificação do técnico e do instante da operação.
+As operações são atribuídas à entidade `Chamado`:
 
-As políticas de autorização consideram papel, vínculo departamental e relação com o chamado. A aplicação verifica essas condições antes de executar a operação, e o domínio preserva as invariantes do atendimento. Encaminhamentos devem conservar intervenções e atribuições anteriores, registrar a justificativa e atualizar a responsabilidade departamental.
+- `abrir()` valida a descrição, define o estado inicial e associa os dados do atendimento;
+- `definir_prioridade()` estabelece a classificação entre baixa, média, alta e crítica;
+- `atribuir_tecnico()` verifica a função do usuário e registra sua associação ao chamado;
+- `iniciar_atendimento()` valida a passagem de atribuído para em atendimento;
+- `concluir()` exige o estado em atendimento, diagnóstico e descrição da intervenção, registrando a conclusão e seu responsável;
+- `encaminhar()` altera o departamento responsável.
 
-## 6. Interfaces e integração entre componentes
+O serviço de aplicação verifica a autorização antes de solicitar essas operações. A entidade preserva as regras que não podem ser violadas durante sua execução. Assim, uma pessoa autorizada ainda não pode concluir um chamado em estado inválido ou sem os dados obrigatórios.
 
-As interfaces são definidas de acordo com as necessidades dos casos de uso. Seus contratos devem especificar entradas, retornos, erros e garantias de persistência.
+## 4. Distribuição de responsabilidades
 
-| Contrato | Finalidade |
+### 4.1. Apresentação
+
+`TelaAbrirChamado` e `TelaListaChamados` apresentam os dados e enviam solicitações ao servidor. `ManutencaoController` recebe essas operações, utiliza esquemas para organizar entrada e saída e encaminha o processamento ao serviço.
+
+O controller converte resultados e erros em respostas HTTP. Ele não realiza consultas SQL nem executa as regras de conclusão do atendimento.
+
+`AgendadorNotificacoes` também pertence à apresentação do servidor, pois aciona um caso de uso por um evento de tempo. Sua responsabilidade é iniciar o processamento periódico; o envio efetivo pertence ao notificador.
+
+### 4.2. Aplicação
+
+`ManutencaoService` coordena os nove casos de uso:
+
+| Caso de uso | Método |
 |---|---|
-| **Persistência de chamados** | Recuperar e salvar chamados e seus registros relacionados, incluindo consultas com filtros |
-| **Consulta de equipamentos** | Verificar a existência do equipamento e obter seus dados |
-| **Consulta de usuários e vínculos** | Obter as informações necessárias à autorização |
-| **Persistência de notificações** | Registrar comunicações e controlar seu processamento |
-| **Notificador** | Realizar a entrega por um mecanismo externo sem expor detalhes do protocolo ao caso de uso |
-| **Coordenação transacional** | Garantir confirmação ou reversão conjunta das alterações que compõem uma operação |
+| Registrar chamado | `abrir_chamado()` |
+| Consultar chamados e aplicar filtros | `consultar_chamados()` |
+| Definir prioridade | `definir_prioridade()` |
+| Atribuir técnico | `atribuir_tecnico()` |
+| Iniciar atendimento | `iniciar_atendimento()` |
+| Concluir chamado | `concluir_chamado()` |
+| Consultar histórico do equipamento | `consultar_historico()` |
+| Encaminhar chamado | `encaminhar_chamado()` |
+| Processar notificações pendentes | `reenviar_notificacoes()` |
 
-Os contratos podem ser implementados por repositórios e por uma unidade de trabalho ou mecanismo transacional equivalente. A transação deve abranger todos os registros exigidos pela operação, mesmo quando houver colaboração entre módulos.
+O serviço verifica permissões, recupera informações, chama o domínio, prepara auditoria e notificações e solicita a persistência. `FiltrosChamado` reúne os critérios de consulta. O serviço também compõe a confirmação de abertura por meio de `preencher_confirmacao()`.
 
-As implementações de persistência em memória e notificação simulada permitem testar os casos de uso sem depender de serviços externos. A substituição exige equivalência de comportamento: implementar a mesma assinatura não é suficiente se as garantias de retorno, erro ou salvamento forem diferentes.
+Na conclusão, por exemplo, a aplicação recupera o usuário e o chamado, verifica a atribuição e o departamento, solicita `Chamado.concluir()`, cria a auditoria e a notificação e chama o repositório. O serviço coordena a operação; a entidade valida as regras do atendimento; o repositório garante a gravação transacional.
 
-## 7. Comunicação e fluxos principais
+### 4.3. Contratos e infraestrutura
 
-### 7.1. API REST
-
-A API utiliza HTTP e JSON. Os recursos representam chamados, equipamentos e registros associados ao atendimento. As operações de escrita passam por autorização e validação no servidor. As consultas aplicam os mesmos limites de visibilidade, inclusive quando combinam filtros.
-
-A documentação OpenAPI deve descrever parâmetros, esquemas, respostas e erros. As respostas distinguem dados inválidos, identidade não autenticada, falta de permissão, recurso inexistente e conflito com o estado atual do chamado.
-
-A identidade utilizada na autorização deve ser estabelecida por um mecanismo confiável de autenticação. Informar apenas um identificador de usuário na requisição não comprova sua identidade. O mecanismo de autenticação pode ser substituído sem transferir as regras de autorização para o cliente.
-
-### 7.2. Abertura de chamado
-
-1. O cliente informa equipamento, descrição, data da ocorrência e informações adicionais.
-2. A apresentação encaminha a solicitação ao serviço de aplicação.
-3. A aplicação verifica o solicitante e a existência do equipamento.
-4. O domínio cria o chamado no estado aberto e associa o departamento responsável.
-5. A aplicação prepara auditoria e notificação de confirmação.
-6. A persistência salva chamado, auditoria e notificação na mesma transação.
-7. Após a confirmação, a API devolve o resultado ao cliente. O envio da mensagem ocorre posteriormente.
-
-### 7.3. Conclusão de chamado
-
-1. A aplicação recupera o chamado e verifica se o usuário é um técnico autorizado e atribuído ao atendimento.
-2. O domínio valida o estado atual e a existência do diagnóstico e da intervenção exigidos.
-3. A operação registra a intervenção, a conclusão, o técnico responsável e a data e hora.
-4. São preparados o registro de auditoria e a notificação ao solicitante.
-5. Todas as alterações são confirmadas na mesma transação.
-6. O cliente recebe a confirmação, enquanto a entrega da notificação é processada separadamente.
-
-Uma falha de validação ou autorização impede a alteração. Uma falha de persistência provoca a reversão da transação. A indisponibilidade do serviço de e-mail não desfaz uma conclusão já confirmada.
-
-### 7.4. Consultas e histórico
-
-As consultas permitem combinar filtros por equipamento, prioridade, técnico, estado, período, solicitante e departamento. O histórico de um equipamento reúne chamados, intervenções, técnicos e datas relevantes.
-
-A aplicação restringe a visibilidade antes de devolver os dados. O solicitante consulta seus chamados; técnicos e coordenadores consultam os chamados de seu departamento, conforme as regras definidas. Após um encaminhamento, o acesso acompanha o departamento responsável, preservando o acesso do solicitante e o registro da transferência.
-
-## 8. Persistência e implantação
-
-A persistência utiliza **PostgreSQL**, adequado às relações entre chamados, equipamentos, usuários, atribuições e intervenções. Suas transações permitem confirmar conjuntamente alterações de atendimento, auditoria e notificações.
-
-O acesso é realizado por adaptadores de infraestrutura com SQL e `psycopg`. O SQL fica isolado dos serviços de aplicação e das entidades. Essa escolha mantém explícitas as consultas e transações e evita introduzir uma camada de mapeamento adicional sem necessidade do trabalho. A [ADR-001](adr/ADR-001.md) detalha a decisão de persistência e ambiente.
-
-Chaves estrangeiras e restrições de integridade complementam as validações do domínio. As regras do ciclo de vida continuam sendo responsabilidades de negócio: restringir os valores possíveis de um estado não é suficiente para validar a transição entre estados.
-
-O ambiente de execução utiliza Docker Compose para iniciar a aplicação, PostgreSQL e um servidor de e-mail de demonstração, Mailpit. O armazenamento do banco utiliza volume persistente. Configurações de conexão são fornecidas externamente à lógica de negócio.
-
-O backend constitui uma unidade de implantação. PostgreSQL e o servidor SMTP são dependências externas, não módulos de negócio implantados como microsserviços.
-
-## 9. Decisões orientadas pelos ASRs
-
-### 9.1. ASR01 — Rastreabilidade do histórico
-
-Toda alteração relevante deve produzir um registro com chamado, autor, instante, tipo de alteração e, quando aplicável, valores anteriores e posteriores. Isso inclui estado, prioridade, atribuições, intervenções e departamento responsável.
-
-A alteração e sua auditoria são salvas na mesma transação. Os registros de auditoria não devem ser sobrescritos por operações comuns da aplicação, e o banco deve aplicar proteções contra alteração ou exclusão indevida.
-
-Atribuições e intervenções possuem registros próprios para preservar a participação dos técnicos e as atividades realizadas. Assim, mudanças posteriores não apagam a sequência necessária à reconstrução do atendimento.
-
-**Justificativa:** manter apenas o estado atual do chamado não permite explicar como o atendimento evoluiu. A auditoria transacional evita alterações confirmadas sem evidência correspondente.
-
-**Verificação:** executar uma sequência de operações e consultar quem realizou cada uma, quando ocorreu e quais dados foram modificados.
-
-### 9.2. ASR02 — Controle de acesso por papel e departamento
-
-A autorização é verificada na aplicação em cada operação, considerando identidade, papel, vínculo departamental e atribuição ao chamado. Regras de interface não substituem essa verificação.
-
-As consultas também respeitam o escopo autorizado. A tentativa de acesso indevido deve ser recusada sem modificar os dados, inclusive quando realizada diretamente pela API.
-
-**Justificativa:** o sistema atende diferentes departamentos e funções. Centralizar as políticas no servidor reduz a duplicação de regras entre clientes e impede que o acesso dependa apenas dos controles visuais da interface.
-
-**Verificação:** tentar consultar ou modificar chamados fora do escopo permitido e confirmar a recusa e a preservação dos dados.
-
-### 9.3. ASR03 — Confiabilidade das notificações
-
-A notificação é registrada junto com a operação que a originou, antes da tentativa de comunicação externa. Um processador periódico consulta as pendências, realiza o envio e atualiza o resultado. Esse mecanismo utiliza uma fila persistida no banco, seguindo a ideia de uma outbox transacional.
-
-Falhas de comunicação mantêm a mensagem disponível para recuperação. As tentativas devem ter intervalos controlados para evitar sobrecarga. Caso seja adotado um limite automático, as mensagens esgotadas precisam permanecer consultáveis e contar com reprocessamento explícito; não podem ser simplesmente abandonadas.
-
-O processador deve coordenar a seleção de mensagens para reduzir envios simultâneos da mesma pendência. Ainda assim, uma falha após a aceitação pelo serviço externo e antes do registro local de sucesso pode causar repetição. A solução deve considerar identificação da mensagem e deduplicação quando o provedor oferecer esse recurso, sem pressupor entrega exatamente uma vez.
-
-**Justificativa:** a disponibilidade do e-mail não deve determinar o sucesso do atendimento. A persistência permite retomar o processamento após falhas ou reinícios, sem manter uma transação de banco aberta durante o envio.
-
-**Verificação:** interromper o serviço de e-mail, abrir ou concluir um chamado, confirmar a persistência da operação e da pendência e verificar a retomada após o restabelecimento do serviço.
-
-## 10. Aplicação de GRASP e SOLID
-
-### 10.1. GRASP
-
-| Princípio | Aplicação na arquitetura |
-|---|---|
-| **Information Expert** | Chamado valida seu ciclo de vida; atribuições preservam a participação dos técnicos; intervenções registram as atividades; notificações controlam sua situação de entrega |
-| **Controller** | Controllers recebem solicitações externas e serviços de aplicação coordenam os casos de uso |
-| **Low Coupling** | Contratos isolam domínio e aplicação de banco, protocolo de e-mail e interface do usuário |
-| **High Cohesion** | Módulos e entidades agrupam responsabilidades relacionadas ao mesmo conceito, evitando concentrar o atendimento inteiro em uma classe |
-| **Polymorphism** | Adaptadores diferentes implementam contratos de persistência e notificação |
-| **Indirection e Protected Variations** | Interfaces intermedeiam integrações e limitam o impacto de substituições tecnológicas |
-
-### 10.2. SOLID
-
-| Princípio | Decisão de design |
-|---|---|
-| **SRP — Responsabilidade única** | Separar regras do atendimento, coordenação de casos de uso, persistência, formatação e envio de mensagens |
-| **OCP — Aberto/fechado** | Permitir novos adaptadores e estratégias quando houver necessidade concreta, preservando os consumidores dos contratos existentes |
-| **LSP — Substituição de Liskov** | Exigir que implementações alternativas mantenham as garantias comportamentais dos contratos |
-| **ISP — Segregação de interfaces** | Definir contratos conforme as necessidades dos consumidores, evitando obrigar componentes a depender de operações sem relação com sua função |
-| **DIP — Inversão de dependências** | Fazer a aplicação depender de abstrações implementadas pela infraestrutura, conectadas por injeção de dependências |
-
-A aplicação desses princípios deve ser proporcional à complexidade do sistema. Interfaces e estratégias são introduzidas para proteger variações e responsabilidades identificadas, não para multiplicar classes sem uma necessidade concreta.
-
-## 11. Evolução da solução
-
-| Mudança | Elementos afetados | Elementos preservados e condições |
+| Contrato | Responsabilidade | Implementações |
 |---|---|---|
-| **Substituir PostgreSQL** | Adaptadores, esquema, configuração e implantação | Domínio e casos de uso permanecem se os contratos e as garantias transacionais forem mantidos |
-| **Trocar provedor de e-mail** | Configuração e eventualmente adaptador SMTP | Regras de atendimento e processamento de pendências permanecem compatíveis com o contrato |
-| **Adicionar outro canal de comunicação** | Adaptador, destinatário e composição de conteúdo, conforme o canal | Separação entre atendimento e entrega continua aplicável; a mudança pode exigir evolução do contrato de notificação |
-| **Adicionar aplicativo mobile** | Novo cliente e eventual ampliação da API | Serviços de aplicação, regras de domínio e políticas de autorização são reutilizados |
-| **Aumentar a carga** | Consultas, índices, recursos de execução e coordenação dos processadores | Limites lógicos dos módulos permanecem; concorrência e transações precisam ser verificadas |
-| **Separar um módulo para implantação independente** | Contratos remotos, observabilidade e estratégia de consistência | Fronteiras de negócio ajudam a identificar o recorte, mas transações compartilhadas precisam ser redesenhadas |
+| **ManutencaoRepositorio** | Consultar chamados, equipamentos, usuários, departamentos, histórico e auditoria; salvar alterações; consultar e atualizar notificações | `PostgresManutencaoRepositorio` e `RepositorioEmMemoria` |
+| **Notificador** | Enviar uma notificação e comunicar falhas de envio | `SmtpNotificador` e `NotificadorFake` |
 
-A arquitetura permite avaliar cada evolução a partir das responsabilidades e contratos afetados. A separação em módulos e camadas reduz o alcance das mudanças, enquanto as garantias de autorização, rastreabilidade e recuperação devem ser preservadas em qualquer substituição tecnológica.
+As interfaces ficam na aplicação porque representam suas necessidades. A infraestrutura fornece as implementações. O serviço recebe os objetos por seus construtores, sem decidir qual banco ou mecanismo de envio será utilizado.
+
+O repositório PostgreSQL concentra SQL, conversão de dados e transações. O repositório em memória permite testar operações sem banco. O notificador SMTP conhece o protocolo de envio; o fake permite simular seu comportamento nos testes.
+
+A operação de salvamento reúne os dados que precisam ser confirmados conjuntamente. O serviço não abre uma conexão SQL nem mantém a transação do chamado aberta durante o envio de e-mail.
+
+## 5. Aplicação dos princípios GRASP
+
+### 5.1. Information Expert — Especialista na informação
+
+A responsabilidade deve ficar com o objeto que possui as informações necessárias para executá-la. `Chamado` conhece seu estado, técnicos, diagnóstico e descrição da intervenção, sendo responsável por validar seu ciclo de vida.
+
+`Usuario` conhece seu papel e departamento e oferece verificações como `e_tecnico()` e `e_coordenador_de()`. `Notificacao` conhece seu estado e número de tentativas e controla as mudanças produzidas por sucesso ou falha de envio.
+
+### 5.2. Controller — Controlador
+
+`ManutencaoController` recebe solicitações externas e as encaminha ao `ManutencaoService`. O serviço atua como coordenador dos casos de uso, organizando autorização, recuperação de dados, execução das regras e persistência.
+
+Essa distribuição evita que a interface execute o processo inteiro e permite que o agendador também utilize a camada de aplicação.
+
+### 5.3. Low Coupling — Baixo acoplamento
+
+O domínio não conhece banco de dados, HTTP ou serviço de e-mail. A aplicação utiliza `ManutencaoRepositorio` e `Notificador`, mantendo as dependências tecnológicas nas implementações de infraestrutura.
+
+Assim, uma mudança no mecanismo de persistência ou envio pode ser concentrada na implementação do contrato, desde que suas garantias sejam preservadas.
+
+### 5.4. High Cohesion — Alta coesão
+
+As responsabilidades são agrupadas por propósito: controller trata comunicação, serviço coordena operações, entidades mantêm regras e dados do negócio, repositório persiste e notificador envia mensagens.
+
+`ManutencaoService` concentra os casos de uso de manutenção e o processamento de notificações. Para preservar sua coesão, os detalhes de SQL e SMTP ficam fora dele, e as regras do ciclo de vida permanecem em `Chamado`.
+
+### 5.5. Polymorphism, Indirection e Protected Variations
+
+As implementações de repositório e notificador são utilizadas por suas interfaces. O polimorfismo permite trocar PostgreSQL por memória ou SMTP por uma simulação sem alterar a forma como o serviço chama essas dependências.
+
+As interfaces oferecem uma indireção entre o caso de uso e a tecnologia, protegendo os consumidores das variações internas das implementações.
+
+## 6. Aplicação dos princípios SOLID
+
+### 6.1. SRP — Princípio da responsabilidade única
+
+As responsabilidades são distribuídas entre comunicação, coordenação, regras de negócio, persistência e envio. Uma alteração em SQL pertence ao repositório, enquanto uma alteração na regra de conclusão pertence ao domínio.
+
+O serviço concentra a coordenação dos casos de uso e a composição da confirmação. Por reunir essas atividades, exige atenção aos diferentes motivos de alteração; a separação em camadas ajuda a limitar essa concentração, mas não significa que toda classe possua apenas uma responsabilidade estrita.
+
+### 6.2. OCP — Princípio aberto/fechado
+
+Os contratos permitem acrescentar implementações de persistência e notificação preservando os consumidores existentes. Uma nova implementação é conectada na inicialização da aplicação.
+
+Essa possibilidade depende da compatibilidade do contrato. Se um novo canal exigir destinatários ou conteúdos diferentes, o modelo de notificação também poderá precisar de alteração. O princípio orienta a extensão dos pontos identificados de variação, sem exigir abstrações para todas as mudanças possíveis.
+
+### 6.3. LSP — Princípio da substituição de Liskov
+
+Implementações que atendem à mesma interface devem preservar o comportamento esperado pelos consumidores. PostgreSQL e memória precisam respeitar os resultados das consultas e as garantias de salvamento. Notificadores devem respeitar o contrato de envio e de comunicação de falhas.
+
+Compartilhar métodos com os mesmos nomes não basta: erros, efeitos e condições de uso também precisam ser compatíveis. Testes dos contratos ajudam a verificar essa substituição.
+
+### 6.4. ISP — Princípio da segregação de interfaces
+
+A separação entre `Notificador` e `ManutencaoRepositorio` distingue comunicação e persistência. `Notificador` possui uma operação específica de envio.
+
+`ManutencaoRepositorio` é mais abrangente e reúne operações de diferentes entidades utilizadas pelo serviço. Portanto, a segregação é aplicada por tipo de dependência, sem divisão fina das consultas e gravações por consumidor. Essa característica deve ser considerada ao avaliar o tamanho e a evolução do contrato.
+
+### 6.5. DIP — Princípio da inversão de dependências
+
+`ManutencaoService` depende das interfaces `ManutencaoRepositorio` e `Notificador`, e não das classes concretas de PostgreSQL ou SMTP. A infraestrutura implementa essas interfaces, e o ponto de inicialização fornece os objetos ao serviço.
+
+Essa direção de dependência mantém a coordenação do negócio independente dos mecanismos técnicos e permite testar os casos de uso com implementações simuladas. O domínio permanece livre das dependências de apresentação e infraestrutura.

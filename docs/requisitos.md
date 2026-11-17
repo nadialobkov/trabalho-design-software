@@ -1,7 +1,47 @@
-# Requisitos — Sistema de manutenção de equipamentos de laboratório
+# Sistema de manutenção de equipamentos de laboratório
+
+## 1. Contexto
+
+Na Universidade existem laborátorios de diversos departamentos que possuem equipamentos, por exemplo computadores, projetores, ar condicionado, maquinárias, ferramentas, beckers, câmeras, microfones, etc. Como muitos alunos, professores e pesquisadores utilizam esses equipamentos, eles precisam de manutenção com uma certa frequência. O problema é que, atualmente, não há uma maneira eficiente de gerenciar a manutenção dos equipamentos. Os alunos, professores e pesquisadores tem dificuldade na comunicação com os responsáveis de manutenção, os técnicos responsáveis não tem um registro centralizado dos pedidos de manutenção, os coordenadores de manutenção têm dificuldade em gerenciar as solicitações.
+
+O objetivo então é desenvolver um sistema para registrar chamados de manutenção, classificar prioridades, atribuir técnicos, acompanhar intervenções e manter o histórico dos equipamentos. A Universidade conta com cerca de 45 mil pessoas, dentre elas alunos (~38.550) e servidores (~5.925), mas a previsão é que os servidores (professores, técnicos, coordenadores) sejam os principais usuários do sistema.
+
+## 2. Principais atores
+
+### Solicitantes
+
+**Solicitante:** Professores, Pesquisadores, Laboratoristas, Alunos ou pessoas autorizadas a utilizar o laboratório.
+Ações principais:
+
+* abrir chamado;
+     * informar equipamento;
+     * descrever problema;
+* consultar informações do chamado
+
+### Cordenadores
+
+**Coordenadores:** Coordenador de Manutenção de cada departamento da universidade. 
+Ações Principais:
+
+* consultar chamados pendentes
+* definir ou alterar prioridade
+* atribuir ou técnico
+* acompanhar chamados atrasados ou críticos
+* delegar o problema para outro coordenador de manutenção
+
+### Técnicos
+
+**Técnicos:** Técnicos de Manutenção de diferentes departamento da universidade.  
+
+Ações principais:
+* visualizar chamados atribuídos;
+* iniciar atendimento
+* registrar diagnóstico
+* alterar situação do atendimento
+	* concluir manutenção
 
 
-## 1. Requisitos funcionais
+## 3. Requisitos funcionais
 
 ### RF01 — Registrar chamado de manutenção
 
@@ -69,7 +109,7 @@ O sistema deve permitir que um técnico atribuído ao chamado inicie o atendimen
 
 **Justificativa:** indicar que o problema já está sendo tratado e permitir o acompanhamento do andamento do chamado.
 
-## 2. Restrições e regras de negócio
+## 4. Restrições e regras de negócio
 
 ### RN01 — Vínculo obrigatório com equipamento existente
 
@@ -93,7 +133,7 @@ Nesse fluxo, a passagem direta de Aberto para Concluído deve ser impedida. A co
 
 **Justificativa:** evitar estados incompatíveis com o andamento do atendimento e preservar a coerência do histórico.
 
-## 3. Requisitos arquiteturalmente significativos — ASRs
+## 5. Requisitos arquiteturalmente significativos — ASRs
 
 ### ASR01 — Rastreabilidade do histórico de manutenção
 
