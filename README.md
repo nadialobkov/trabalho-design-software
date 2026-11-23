@@ -102,7 +102,7 @@ Os testes do PostgreSQL apagam e recriam o banco `manutencao_teste`. Nunca use o
 
 ```text
 src/manutencao/
-├── aapresentacao/    # Apresentação: rotas HTTP (controller) e agendador de e-mails
+├── apresentacao/    # Apresentação: rotas HTTP (controller) e agendador de e-mails
 ├── aplicacao/        # Aplicação: ManutencaoService e as interfaces (repositório, notificador)
 ├── dominio/          # Domínio: Chamado, Usuario, Equipamento... e as regras de negócio
 ├── infraestrutura/   # Infraestrutura: PostgreSQL, memória, SMTP e notificador falso
