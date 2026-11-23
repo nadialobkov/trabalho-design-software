@@ -17,7 +17,7 @@
 
 ## Como rodar o protótipo
 
-O protótipo é o backend em Python (FastAPI). Ele implementa o UC01 (abrir chamado), o UC02 (consultar chamados) e o envio assíncrono do e-mail de confirmação (UC09). As telas React ficam para uma próxima etapa; por enquanto a API é usada pela página `/docs`.
+O protótipo tem telas em React e um backend em Python (FastAPI). Ele implementa o UC01 (abrir chamado), o UC02 (consultar chamados) e o envio assíncrono do e-mail de confirmação (UC09).
 
 ### O que instalar
 
@@ -25,6 +25,7 @@ O protótipo é o backend em Python (FastAPI). Ele implementa o UC01 (abrir cham
 |---|---|
 | [Docker](https://docs.docker.com/get-docker/) com Docker Compose | Sobe a aplicação, o PostgreSQL e o Mailpit (caixa de e-mail falsa) |
 | [uv](https://docs.astral.sh/uv/) (opcional) | Só para rodar os testes ou a API fora do Docker: `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| [Node.js](https://nodejs.org/) 24 (opcional) | Só para rodar as telas fora do Docker |
 
 Não é preciso instalar PostgreSQL nem Mailpit: eles rodam em contêineres.
 
@@ -34,10 +35,11 @@ Não é preciso instalar PostgreSQL nem Mailpit: eles rodam em contêineres.
 docker compose up --build
 ```
 
-O comando sobe três serviços ao mesmo tempo:
+O comando sobe quatro serviços ao mesmo tempo:
 
 | Serviço | O que é | Endereço |
 |---|---|---|
+| `web` | As telas React (servidas pelo nginx) | `http://localhost:8080` |
 | `app` | O backend (o monólito) | `http://localhost:7555/docs` |
 | `db` | PostgreSQL 18, já com as tabelas e os dados de exemplo | `localhost:5433` |
 | `mailpit` | Caixa de e-mail falsa | `http://localhost:8025` |
@@ -48,7 +50,7 @@ Para parar: `Ctrl+C`, ou `docker compose down`. Para apagar todos os dados e vol
 
 Depois de mudar o código, rode `docker compose up --build` de novo.
 
-Abra `http://localhost:7555/docs`. Não há login: o usuário é informado no cabeçalho `X-Usuario-Id`.
+Abra `http://localhost:8080`. Não há login: escolha o usuário no campo **Acessando como**, no topo da tela. As telas enviam esse usuário no cabeçalho `X-Usuario-Id`, e o backend decide o que ele pode ver e fazer. A API também pode ser usada direto pela página `http://localhost:7555/docs`.
 
 | id | Usuário | Papel | Departamento |
 |---|---|---|---|
@@ -67,6 +69,8 @@ Exemplo de corpo para `POST /chamados`:
 ```
 
 O chamado é salvo na hora e o e-mail fica na fila como `PENDENTE`. Em até 10 segundos o agendador envia o e-mail, que aparece no Mailpit.
+
+Para ver o erro de equipamento inexistente (RN01), escolha **Informar outro código…** na tela de abertura e digite um código que não existe, como `99`.
 
 ### Rodar a API fora do Docker (opcional)
 
@@ -88,6 +92,20 @@ O `.env` diz onde estão o banco e o servidor de e-mail:
 
 Para usar um provedor real, como o Gmail, preencha também `SMTP_USUARIO` e `SMTP_SENHA` (veja o `.env.example`).
 
+### Rodar as telas fora do Docker (opcional)
+
+Com a API rodando na porta 7555 (no Docker ou com `uv run`):
+
+```bash
+cd frontend
+npm install          # primeira vez
+npm run dev          # telas em http://localhost:5173, recarregam a cada mudança
+```
+
+O Vite repassa os pedidos de `/api` para `http://localhost:7555`. Para usar outra porta: `API_URL=http://localhost:7556 npm run dev`.
+
+As telas ainda não têm como buscar usuários e equipamentos na API, então usam uma cópia dos dados de exemplo em `frontend/src/dados/catalogo.js`. Se `banco/dados_exemplo.sql` mudar, atualize esse arquivo também.
+
 ### Testes
 
 ```bash
@@ -101,14 +119,18 @@ Os testes do PostgreSQL apagam e recriam o banco `manutencao_teste`. Nunca use o
 ### Organização do código
 
 ```text
+frontend/             # Apresentação no navegador: telas React (Vite)
+├── src/telas/        # TelaAbrirChamado (UC01) e TelaListaChamados (UC02)
+├── src/api/          # Cliente HTTP: envia o cabeçalho X-Usuario-Id
+└── nginx.conf        # No Docker: serve as telas e repassa /api ao backend
 src/manutencao/
-├── aapresentacao/    # Apresentação: rotas HTTP (controller) e agendador de e-mails
+├── apresentacao/    # Apresentação: rotas HTTP (controller) e agendador de e-mails
 ├── aplicacao/        # Aplicação: ManutencaoService e as interfaces (repositório, notificador)
 ├── dominio/          # Domínio: Chamado, Usuario, Equipamento... e as regras de negócio
 ├── infraestrutura/   # Infraestrutura: PostgreSQL, memória, SMTP e notificador falso
 └── main.py           # Escolhe as implementações (pelo .env) e monta a aplicação
 banco/                # schema.sql (tabelas), dados_exemplo.sql e criar_banco_teste.sql
-docker-compose.yml    # sobe app + PostgreSQL + Mailpit
+docker-compose.yml    # sobe telas + app + PostgreSQL + Mailpit
 Dockerfile            # imagem do backend
 docs/                 # requisitos, diagramas e ADRs
 ```

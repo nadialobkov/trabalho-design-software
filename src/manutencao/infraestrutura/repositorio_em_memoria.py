@@ -104,7 +104,7 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
         ]
 
     def listar_pendentes(self) -> list[Notificacao]:
-        # Copy first: the scheduler thread may read while a request adds one.
+        # Copia os valores porque uma requisição pode adicionar uma notificação durante a leitura pelo agendador.
         return [
             notificacao
             for notificacao in list(self._notificacoes.values())

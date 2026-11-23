@@ -17,24 +17,24 @@ Cursor = psycopg.Cursor[dict[str, Any]]
 
 
 class PostgresManutencaoRepositorio(ManutencaoRepositorio):
-    """Stores everything in PostgreSQL. Tables are in banco/schema.sql.
+    """Armazena os dados no PostgreSQL. As tabelas estão em banco/schema.sql.
 
-    Each method opens its own connection, so it is safe to use from the
-    request threads and from the scheduler thread at the same time.
+    Cada operação abre sua própria conexão, permitindo o uso simultâneo
+    pelas requisições HTTP e pelo agendador.
     """
 
-    # How long a notification stays reserved for the instance sending it.
-    # Much longer than one send (SMTP timeout is 10 s).
+    # Tempo de reserva da notificação para a instância responsável pelo envio.
+    # É maior que o tempo limite de 10 segundos da conexão SMTP.
     RESERVA = "5 minutes"
 
     def __init__(self, url: str) -> None:
         self.url = url
 
     def _conectar(self) -> psycopg.Connection[dict[str, Any]]:
-        # "with" on the connection commits on success and rolls back on error.
+        # O bloco with confirma a transação ao terminar e a desfaz em caso de erro.
         return psycopg.connect(self.url, row_factory=dict_row)
 
-    # --- tickets ---------------------------------------------------------
+    # --- chamados --------------------------------------------------------
 
     def buscar_chamado(self, chamado_id: int) -> Chamado | None:
         with self._conectar() as conn, conn.cursor() as cur:
@@ -82,8 +82,7 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
         auditoria: RegistroAuditoria,
         notificacao: Notificacao | None = None,
     ) -> None:
-        # One transaction: ticket, audit and notification are saved together
-        # or not at all (ASR01, ASR03).
+        # Grava o chamado, a auditoria e a notificação na mesma transação (ASR01, ASR03).
         with self._conectar() as conn, conn.cursor() as cur:
             valores = {
                 "equipamento_id": chamado.equipamento.id,
@@ -116,7 +115,7 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
                     {**valores, "id": chamado.id},
                 )
 
-            # Rewrite the technician list so it matches chamado.tecnicos.
+            # Sincroniza a lista de técnicos no banco com chamado.tecnicos.
             cur.execute("DELETE FROM chamado_tecnico WHERE chamado_id = %s", (chamado.id,))
             for tecnico in chamado.tecnicos:
                 cur.execute(
@@ -137,8 +136,8 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
 
             if notificacao is not None:
                 if notificacao.id is None:
-                    # Without text yet, it starts reserved, so the scheduler does
-                    # not take it before atualizar_notificacao() writes the text.
+                    # Uma notificação sem texto começa reservada. Assim, o agendador
+                    # aguarda atualizar_notificacao() gravar o texto e liberar a reserva.
                     cur.execute(
                         "INSERT INTO notificacao (chamado_id, destinatario, assunto,"
                         " mensagem, status, tentativas, reservada_ate)"
@@ -158,7 +157,7 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
     def historico_equipamento(self, equipamento_id: int) -> list[Chamado]:
         return self.listar_chamados(FiltrosChamado(equipamento_id=equipamento_id))
 
-    # --- reference data --------------------------------------------------
+    # --- usuários, equipamentos e departamentos --------------------------
 
     def buscar_equipamento(self, equipamento_id: int) -> Equipamento | None:
         with self._conectar() as conn, conn.cursor() as cur:
@@ -172,7 +171,7 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
         with self._conectar() as conn, conn.cursor() as cur:
             return self._carregar_departamento(cur, departamento_id)
 
-    # --- audit and notifications ----------------------------------------
+    # --- auditoria e notificações ----------------------------------------
 
     def listar_auditoria(self, chamado_id: int) -> list[RegistroAuditoria]:
         with self._conectar() as conn, conn.cursor() as cur:
@@ -198,10 +197,9 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
             ]
 
     def listar_pendentes(self) -> list[Notificacao]:
-        # Reserves the rows it returns, so two app instances on the same database
-        # never send the same e-mail. SKIP LOCKED: rows another instance is
-        # reserving right now are left out instead of waited for.
-        # atualizar_notificacao() frees the row again.
+        # Reserva as notificações retornadas para evitar envios duplicados.
+        # SKIP LOCKED pula, sem esperar, as linhas que outra instância está reservando.
+        # atualizar_notificacao() libera a reserva.
         with self._conectar() as conn, conn.cursor() as cur:
             cur.execute(
                 f"UPDATE notificacao SET reservada_ate = now() + interval '{self.RESERVA}'"
@@ -231,13 +229,13 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
         with self._conectar() as conn, conn.cursor() as cur:
             self._atualizar_notificacao(cur, notificacao)
 
-    # --- helpers: turn rows into domain objects --------------------------
+    # --- operações auxiliares de atualização e leitura -------------------
 
     @staticmethod
     def _atualizar_notificacao(cur: Cursor, notificacao: Notificacao) -> None:
         cur.execute(
             "UPDATE notificacao SET assunto = %s, mensagem = %s, status = %s, tentativas = %s,"
-            " reservada_ate = NULL"  # done with it: free it for the next round
+            " reservada_ate = NULL"  # Libera a reserva para a próxima rodada.
             " WHERE id = %s",
             (
                 notificacao.assunto, notificacao.mensagem, str(notificacao.status),

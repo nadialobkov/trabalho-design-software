@@ -18,7 +18,7 @@ LAYERS = {
 def test_layer_imports_follow_dependency_rules(layer: str) -> None:
     external = {
         "aapresentacao": {"fastapi", "pydantic"},
-        "infraestrutura": {"psycopg"},  # only the infrastructure talks to the database
+        "infraestrutura": {"psycopg"},  # Só a infraestrutura acessa o banco.
     }.get(layer, set())
     for path in sorted((SOURCE / layer).rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

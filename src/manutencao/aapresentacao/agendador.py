@@ -8,24 +8,28 @@ logger = logging.getLogger(__name__)
 
 
 class AgendadorNotificacoes:
-    """Input adapter driven by the clock: resends pending notifications (UC09)."""
+    """Dispara periodicamente o envio de notificações pendentes (UC09)."""
 
     def __init__(self, servico: ManutencaoService, intervalo_segundos: float) -> None:
         self.servico = servico
         self.intervalo_segundos = intervalo_segundos
 
     def executar(self) -> None:
-        """Run one round of resending."""
+        """Executa uma rodada de envio."""
         self.servico.reenviar_notificacoes()
 
     async def rodar(self) -> None:
-        """Run a round every `intervalo_segundos` until the app stops."""
+        """Executa rodadas com pausas de `intervalo_segundos` até a aplicação parar."""
+        logger.info(
+            "Agendador de notificações iniciado com intervalo de %g segundos.",
+            self.intervalo_segundos,
+        )
         while True:
             try:
-                # Sending e-mail blocks, so it runs in a thread and HTTP
-                # requests keep being served meanwhile.
+                # O envio bloqueia a execução, então roda em outra thread.
+                # Assim, o servidor continua atendendo às requisições HTTP.
                 await asyncio.to_thread(self.executar)
             except Exception:
-                # One bad round must not stop the scheduler for good.
-                logger.exception("Failed to resend notifications.")
+                # Registra a falha e mantém o agendador ativo para a próxima rodada.
+                logger.exception("Falha na rodada do agendador de notificações. O agendador tentará novamente.")
             await asyncio.sleep(self.intervalo_segundos)

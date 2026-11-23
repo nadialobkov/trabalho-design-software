@@ -33,7 +33,7 @@ def test_scheduler_sends_pending_email_in_background() -> None:
 
 
 class FlakyService:
-    """Fails on the first round, then counts the rounds."""
+    """Falha na primeira rodada e conta as rodadas executadas."""
 
     def __init__(self) -> None:
         self.rounds = 0

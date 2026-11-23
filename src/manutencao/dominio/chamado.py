@@ -32,7 +32,7 @@ class Chamado:
     prioridade: Prioridade | None = None
     tecnicos: list[Usuario] = field(default_factory=list)
     data_inicio_atendimento: datetime | None = None
-    diagnostico: str | None = None  # cause found by the technician (RF06, RF07)
+    diagnostico: str | None = None  # Causa identificada pelo técnico (RF06, RF07).
     descricao_intervencao: str | None = None
     concluido_por: Usuario | None = None
     data_conclusao: datetime | None = None

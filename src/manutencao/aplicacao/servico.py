@@ -1,3 +1,4 @@
+import logging
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -9,6 +10,9 @@ from manutencao.dominio.chamado import Chamado
 from manutencao.dominio.notificacao import Notificacao
 from manutencao.dominio.registro_auditoria import RegistroAuditoria
 from manutencao.dominio.usuario import Usuario
+
+
+logger = logging.getLogger(__name__)
 
 
 class ManutencaoService:
@@ -38,12 +42,16 @@ class ManutencaoService:
             chamado, usuario, agora,
             campo="estado", valor_anterior=None, valor_novo="ABERTO",
         )
-        # The e-mail is not sent here. It is saved as PENDENTE together with the
-        # ticket, and AgendadorNotificacoes sends it later (RF08, ASR03).
+        # A notificação é salva como PENDENTE junto com o chamado.
+        # O agendador dispara o envio depois (RF08, ASR03).
         notificacao = Notificacao(chamado, destinatario=usuario.email)
         self.repo.salvar_chamado(chamado, auditoria, notificacao)
+        logger.info(
+            "Chamado %s registrado para o equipamento %s. Notificação %s na fila.",
+            chamado.id, equipamento.id, notificacao.id,
+        )
 
-        # The ticket id only exists after saving, so the text is filled now.
+        # Preenche o texto após a gravação, quando o chamado já tem ID.
         self._preencher_confirmacao(notificacao)
         self.repo.atualizar_notificacao(notificacao)
         return chamado
@@ -68,37 +76,55 @@ class ManutencaoService:
         return self.repo.listar_chamados(filtros_restritos)
 
     def reenviar_notificacoes(self) -> None:
-        """UC09: try to send every pending notification once.
+        """Tenta enviar cada notificação pendente uma vez por rodada (UC09).
 
-        Called by AgendadorNotificacoes, not by a user, so there is no
-        permission check.
+        O agendador chama este método em segundo plano, sem verificar permissões.
         """
         for notificacao in self.repo.listar_pendentes():
             if not notificacao.assunto:
-                # The app stopped after saving the ticket but before writing the
-                # text. The ticket has all the data, so write it now; otherwise
-                # it would stay pending forever and never be sent (ASR03).
+                # Se a aplicação parou antes de gravar o texto da notificação,
+                # reconstrói a mensagem com os dados do chamado para poder enviá-la (ASR03).
                 self._preencher_confirmacao(notificacao)
+            tipo_falha = None
             try:
                 self.notificador.enviar(notificacao)
-            except OSError:
-                # E-mail server down: keep it pending and try next round (ASR03).
+            except OSError as erro:
+                tipo_falha = type(erro).__name__
                 notificacao.registrar_falha()
             else:
                 notificacao.marcar_enviada()
             self.repo.atualizar_notificacao(notificacao)
 
+            if tipo_falha is None:
+                logger.info(
+                    "Notificação %s do chamado %s marcada como enviada.",
+                    notificacao.id, notificacao.chamado.id,
+                )
+            else:
+                nivel = (
+                    logging.ERROR
+                    if notificacao.status == Notificacao.Status.FALHOU
+                    else logging.WARNING
+                )
+                logger.log(
+                    nivel,
+                    "Falha no envio da notificação %s do chamado %s. Tentativa %d de %d. "
+                    "Estado %s. Tipo de erro %s.",
+                    notificacao.id, notificacao.chamado.id, notificacao.tentativas,
+                    Notificacao.MAX_TENTATIVAS, notificacao.status, tipo_falha,
+                )
+
     @staticmethod
     def _preencher_confirmacao(notificacao: Notificacao) -> None:
-        """Writes the RF08 confirmation e-mail from the saved ticket.
+        """Monta o e-mail de confirmação a partir do chamado salvo (RF08).
 
-        Used by abrir_chamado() and again by reenviar_notificacoes() when the
-        text was lost, so both write the same e-mail.
+        abrir_chamado() e reenviar_notificacoes() usam este método para gerar
+        o mesmo texto, inclusive quando é preciso reconstruí-lo.
         """
         chamado = notificacao.chamado
         equipamento = chamado.equipamento
         notificacao.assunto = f"Chamado #{chamado.id} registrado"
-        # The e-mail repeats what was registered, so the requester keeps a record (RF08).
+        # O e-mail inclui os dados registrados para o solicitante ter uma cópia (RF08).
         notificacao.mensagem = (
             f"Olá, {chamado.solicitante.nome}.\n"
             "\n"

@@ -22,7 +22,7 @@ def notification() -> Notificacao:
 
 
 class FakeSMTP:
-    """Stands in for smtplib.SMTP and records what it was asked to do."""
+    """Substitui smtplib.SMTP e registra as operações solicitadas."""
 
     instances: list["FakeSMTP"] = []
 
@@ -65,13 +65,13 @@ def test_sends_email_with_notification_fields(
     assert message["To"] == "ana@example.com"
     assert message["Subject"] == "Chamado #1 registrado"
     assert message.get_content().strip() == "Seu chamado #1 ..."
-    # Login (with TLS) only when a user is configured, as Mailpit needs none.
+    # A autenticação com TLS só ocorre quando um usuário é configurado, pois o Mailpit dispensa login.
     expected = ["starttls", f"login {user}", "quit"] if user else ["quit"]
     assert server.calls == expected
 
 
 def test_server_down_raises_oserror(notification: Notificacao) -> None:
-    # Get a free port and close it, so nothing is listening there.
+    # Obtém uma porta livre e fecha o socket para deixá-la sem um servidor escutando.
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]

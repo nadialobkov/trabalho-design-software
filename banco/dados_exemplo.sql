@@ -1,5 +1,5 @@
--- Sample data: the same users and equipment as RepositorioEmMemoria.com_dados_de_exemplo().
--- There is no screen to create users or equipment (no full CRUD), so they come from here.
+-- Usa os mesmos usuários e equipamentos de RepositorioEmMemoria.com_dados_de_exemplo().
+-- Este script cadastra usuários e equipamentos porque o protótipo ainda não tem tela de cadastro.
 
 INSERT INTO departamento (id, nome) VALUES
     (1, 'Elétrica'),
