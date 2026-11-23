@@ -5,7 +5,7 @@
 A arquitetura escolhida para o projeto foi uma combinação de **Cliente-Servidor**, **Monólito** e **Camadas**. No arquivo `arquitetura.md` é descrito por qual motivo foi escolhido essas arquiteturas.
 
 ```txt
-cliente-servidor + monólito modular + camadas
+cliente-servidor + monólito + camadas
 ```
 
 ## Alternativa A: Microsserviços
