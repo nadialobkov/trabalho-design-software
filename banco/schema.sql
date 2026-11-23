@@ -1,5 +1,5 @@
--- Schema for PostgresManutencaoRepositorio.
--- Running this file again drops and recreates every table (all data is lost).
+-- Esquema usado por PostgresManutencaoRepositorio.
+-- Executar este arquivo de novo apaga e recria as tabelas, eliminando os dados.
 
 DROP TABLE IF EXISTS notificacao, registro_auditoria, chamado_tecnico, chamado,
     equipamento, usuario, departamento CASCADE;
@@ -46,7 +46,7 @@ CREATE TABLE chamado (
     data_conclusao          TIMESTAMP
 );
 
--- Technicians assigned to a ticket (many-to-many).
+-- Técnicos atribuídos aos chamados em uma relação muitos para muitos.
 CREATE TABLE chamado_tecnico (
     chamado_id INTEGER NOT NULL REFERENCES chamado (id),
     tecnico_id INTEGER NOT NULL REFERENCES usuario (id),
@@ -64,7 +64,7 @@ CREATE TABLE registro_auditoria (
     observacao     TEXT NOT NULL DEFAULT ''
 );
 
--- ASR01: the audit trail is never overwritten, not even by a direct SQL command.
+-- Protege o histórico de auditoria contra alterações e exclusões via SQL (ASR01).
 CREATE FUNCTION impedir_alteracao_auditoria() RETURNS trigger AS $$
 BEGIN
     RAISE EXCEPTION 'registro_auditoria is append-only (ASR01)';
@@ -75,7 +75,7 @@ CREATE TRIGGER auditoria_somente_insercao
     BEFORE UPDATE OR DELETE ON registro_auditoria
     FOR EACH ROW EXECUTE FUNCTION impedir_alteracao_auditoria();
 
--- The e-mail queue (ASR03): AgendadorNotificacoes reads the PENDENTE rows.
+-- Fila de e-mails (ASR03). O agendador processa as notificações PENDENTE.
 CREATE TABLE notificacao (
     id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     chamado_id   INTEGER NOT NULL REFERENCES chamado (id),
@@ -85,9 +85,9 @@ CREATE TABLE notificacao (
     status       TEXT NOT NULL
         CHECK (status IN ('PENDENTE', 'ENVIADA', 'FALHOU')),
     tentativas   INTEGER NOT NULL DEFAULT 0,
-    -- While in the future, one app instance is sending this row, so the others
-    -- skip it (no duplicate e-mail). NULL = free. If that instance stops, the
-    -- row is free again when the time passes.
+    -- Enquanto a reserva está vigente, as outras instâncias pulam esta notificação.
+    -- NULL indica que ela está livre. Se a instância parar, a notificação
+    -- fica disponível novamente quando a reserva expira.
     reservada_ate TIMESTAMPTZ
 );
 

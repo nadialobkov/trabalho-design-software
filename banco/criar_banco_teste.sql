@@ -1,3 +1,3 @@
--- Runs once, when the Docker database starts for the first time.
--- Creates the database that the PostgreSQL tests wipe and refill.
+-- Executa uma vez, na primeira inicialização do PostgreSQL no Docker.
+-- Cria o banco cujas tabelas os testes do PostgreSQL recriam e preenchem.
 CREATE DATABASE manutencao_teste;

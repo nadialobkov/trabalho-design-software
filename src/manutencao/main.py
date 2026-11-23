@@ -1,3 +1,4 @@
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -13,17 +14,25 @@ from manutencao.infraestrutura.repositorio_em_memoria import RepositorioEmMemori
 from manutencao.infraestrutura.repositorio_postgres import PostgresManutencaoRepositorio
 
 
-# Read settings such as DATABASE_URL and SMTP_HOST from .env (a variable already set in the shell wins).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Lê configurações como DATABASE_URL e SMTP_HOST do .env.
+# As variáveis já definidas no ambiente têm prioridade.
 load_dotenv()
 
-# With DATABASE_URL set, data is stored in PostgreSQL; without it, in memory.
+# Com DATABASE_URL, os dados ficam no PostgreSQL. Sem ela, ficam em memória.
 url_banco = os.environ.get("DATABASE_URL")
 repo: ManutencaoRepositorio = (
     PostgresManutencaoRepositorio(url_banco)
     if url_banco
     else RepositorioEmMemoria.com_dados_de_exemplo()
 )
-# With SMTP_HOST set, e-mails go to that server (Mailpit locally); without it, to a fake.
+# Com SMTP_HOST, o envio usa o servidor configurado (Mailpit no Docker).
+# Sem essa variável, o envio é simulado.
 smtp_host = os.environ.get("SMTP_HOST")
 notificador: Notificador = (
     SmtpNotificador(
@@ -36,7 +45,12 @@ notificador: Notificador = (
     if smtp_host
     else NotificadorFake()
 )
+logger.info(
+    "Backend configurado com armazenamento em %s e envio de e-mails %s.",
+    "PostgreSQL" if url_banco else "memória",
+    "por SMTP" if smtp_host else "simulado",
+)
 servico = ManutencaoService(repo, notificador)
-# Pending e-mails are sent every 10 seconds (short, so a demo shows it quickly).
+# O agendador espera 10 segundos entre rodadas para facilitar a demonstração.
 agendador = AgendadorNotificacoes(servico, intervalo_segundos=10)
 app = criar_app(servico, agendador)

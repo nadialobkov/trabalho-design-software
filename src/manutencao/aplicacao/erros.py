@@ -1,6 +1,6 @@
 class AcessoNegado(Exception):
-    """User is missing, unknown, or not allowed to do the action (ASR02)."""
+    """Usuário ausente, desconhecido ou sem permissão para a ação (ASR02)."""
 
 
 class EquipamentoNaoEncontrado(Exception):
-    """The equipment id does not exist (RN01)."""
+    """O ID do equipamento informado não existe (RN01)."""

@@ -46,7 +46,7 @@ def test_open_ticket_saves_audit_and_pending_confirmation(
     assert audit.autor.id == 1
     assert audit.data_hora == ticket.data_abertura
     assert (audit.campo, audit.valor_anterior, audit.valor_novo) == ("estado", None, "ABERTO")
-    # Opening only queues the e-mail; nothing is sent yet.
+    # A abertura coloca o e-mail na fila para envio posterior.
     assert notifier.enviadas == []
     [notification] = repo.listar_pendentes()
     assert notification.chamado is ticket
@@ -139,7 +139,7 @@ def test_send_failure_keeps_notification_pending_until_retry_limit(
 def test_resend_rebuilds_notification_without_text(
     service: ManutencaoService, repo: RepositorioEmMemoria, notifier: NotificadorFake
 ) -> None:
-    # Simulates the app stopping between saving the ticket and writing the text.
+    # Simula a interrupção da aplicação entre a gravação do chamado e a do texto.
     ticket = service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
     [notification] = repo.listar_pendentes()
     texto_original = notification.mensagem

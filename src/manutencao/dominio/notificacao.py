@@ -12,7 +12,7 @@ class Notificacao:
         ENVIADA = "ENVIADA"
         FALHOU = "FALHOU"
 
-    # After this many failed sends, stop retrying (ASR03).
+    # Limite de falhas de envio antes de encerrar as tentativas (ASR03).
     MAX_TENTATIVAS: ClassVar[int] = 5
 
     chamado: Chamado

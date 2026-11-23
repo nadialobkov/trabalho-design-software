@@ -82,7 +82,7 @@ def criar_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
-        # Start the scheduler with the server and stop it on shutdown.
+        # Inicia o agendador junto com o servidor e o encerra ao desligar.
         tarefa = asyncio.create_task(agendador.rodar()) if agendador else None
         yield
         if tarefa is not None:
@@ -101,6 +101,6 @@ def criar_app(
 
     registrar_erro(AcessoNegado, 403)
     registrar_erro(EquipamentoNaoEncontrado, 404)
-    # Domain rules raise ValueError for invalid data (e.g. blank description).
+    # O domínio lança ValueError para dados inválidos, como uma descrição em branco.
     registrar_erro(ValueError, 422)
     return app

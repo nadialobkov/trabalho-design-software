@@ -1,7 +1,7 @@
-"""Checks PostgresManutencaoRepositorio against a real database.
+"""Testa PostgresManutencaoRepositorio com um banco PostgreSQL.
 
-Skipped unless TEST_DATABASE_URL points to a database that may be wiped,
-for example: TEST_DATABASE_URL=postgresql:///manutencao_teste
+Para executar estes testes, defina TEST_DATABASE_URL com um banco cujas tabelas
+podem ser apagadas, como TEST_DATABASE_URL=postgresql:///manutencao_teste.
 """
 import os
 from datetime import date, datetime
@@ -27,7 +27,7 @@ pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL is not set")
 
 @pytest.fixture
 def repo() -> PostgresManutencaoRepositorio:
-    # Fresh tables and sample data for every test.
+    # Recria as tabelas e carrega os dados de exemplo para cada teste.
     with psycopg.connect(URL) as conn:
         conn.execute((BANCO / "schema.sql").read_text(encoding="utf-8"))
         conn.execute((BANCO / "dados_exemplo.sql").read_text(encoding="utf-8"))
@@ -135,7 +135,7 @@ def test_two_instances_never_get_the_same_pending_notification(
     [notification] = repo.listar_pendentes()
     assert other_instance.listar_pendentes() == []
 
-    # A failed send keeps it pending and frees it for the next round.
+    # A falha mantém a notificação pendente e a libera para a próxima rodada.
     notification.registrar_falha()
     repo.atualizar_notificacao(notification)
     assert [n.id for n in other_instance.listar_pendentes()] == [notification.id]
@@ -144,7 +144,7 @@ def test_two_instances_never_get_the_same_pending_notification(
 def test_notification_without_text_waits_for_its_text(
     service: ManutencaoService, repo: PostgresManutencaoRepositorio,
 ) -> None:
-    # Between the two steps of abrir_chamado() the scheduler must not take it.
+    # A notificação fica reservada entre as duas etapas de abrir_chamado().
     ticket = service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
     notification = Notificacao(ticket, destinatario="ana@example.com")
     repo.salvar_chamado(ticket, RegistroAuditoria(
@@ -153,7 +153,7 @@ def test_notification_without_text_waits_for_its_text(
     ), notification)
     assert notification.id not in [n.id for n in repo.listar_pendentes()]
 
-    # If the app stopped there, the row is free again once the reservation ends.
+    # Se a aplicação parar nesse ponto, a notificação volta a ficar disponível quando a reserva expira.
     with psycopg.connect(URL) as conn:
         conn.execute(
             "UPDATE notificacao SET reservada_ate = now() - interval '1 second' WHERE id = %s",

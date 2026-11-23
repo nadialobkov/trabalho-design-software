@@ -6,10 +6,10 @@ from manutencao.dominio.notificacao import Notificacao
 
 
 class SmtpNotificador(Notificador):
-    """Sends notifications by e-mail through an SMTP server (RF08).
+    """Envia notificações por e-mail por meio de um servidor SMTP (RF08).
 
-    Locally this is Mailpit (no login, port 1025). A real provider such as
-    Gmail also needs `usuario` and `senha`; then the connection uses TLS.
+    No ambiente local, usa o Mailpit na porta 1025, sem autenticação.
+    Um provedor como o Gmail precisa de `usuario` e `senha` e usa uma conexão TLS.
     """
 
     def __init__(
@@ -33,8 +33,8 @@ class SmtpNotificador(Notificador):
         mensagem["Subject"] = notificacao.assunto
         mensagem.set_content(notificacao.mensagem)
 
-        # Any failure (server down, refused login, timeout) is an OSError,
-        # which the service turns into a retry later (ASR03).
+        # Falhas como servidor indisponível, login recusado e tempo limite geram
+        # OSError. O serviço registra a falha para retomar o envio depois (ASR03).
         with smtplib.SMTP(self.host, self.porta, timeout=10) as servidor:
             if self.usuario:
                 servidor.starttls()
