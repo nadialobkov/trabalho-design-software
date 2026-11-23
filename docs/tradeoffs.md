@@ -2,7 +2,7 @@
 
 ## Arquitetura escolhida
 
-A arquitetura escolhida para o projeto foi uma combinação de **Cliente-Servidor**, **Monólito Modular** e **Camadas**. No arquivo `arquitetura.md` é descrito por qual motivo foi escolhido essas arquiteturas.
+A arquitetura escolhida para o projeto foi uma combinação de **Cliente-Servidor**, **Monólito** e **Camadas**. No arquivo `arquitetura.md` é descrito por qual motivo foi escolhido essas arquiteturas.
 
 ```txt
 cliente-servidor + monólito modular + camadas
@@ -14,7 +14,7 @@ A arquitetura **Microsserviços** foi descartada logo no ínicio na discussão d
 
 O fato de nossa equipe atual ser de **três integrantes** dificulta ainda mais a implementação de um sistema de microsserviços, uma vez que este exige uma equipe maior e mais especializada em cada serviço.
 
-Por esses motivos, a escolha da arquitetura **Monólito Modular** se viu mais adequada, pois é robusta, mais simples de implementar, tem os módulos bem organizados e é fácil depurar.
+Por esses motivos, a escolha da arquitetura **Monólito** se viu mais adequada, pois é robusta, mais simples de implementar, tem os módulos bem organizados e é fácil depurar.
 
 
 ## Alternativa B: Data-Centered
@@ -30,3 +30,16 @@ Entretanto, no contexto deste projeto, **o problema principal não é apenas com
 A arquitetura **Event-Driven** (orientada a eventos) foi considerada como alternativa porque o domínio possui vários acontecimentos naturais que podem ser representados como eventos: abertura de chamado, definição de prioridade, atribuição de técnico, início do atendimento, conclusão, encaminhamento entre departamentos e envio de notificações. Nesse estilo, componentes publicam eventos em um mecanismo de mensagens (*broker*) e outros componentes reagem a esses eventos de forma assíncrona.
 
 Entretanto, no **contexto deste projeto, o problema principal não é apenas reagir a fatos passados, mas garantir a execução consistente de comandos com regras bem definidas.** O sistema precisa validar se um técnico está atribuído ao chamado, se o chamado está no estado correto, se o usuário tem permissão sobre o departamento responsável e se diagnóstico e intervenção foram informados antes da conclusão. Essas verificações precisam ocorrer antes da operação ser aceita, e não apenas depois, por meio de eventos. Além disso, é introduzida uma **complexidade operacional maior**, que não é ideal visto o pouco tempo para implementação e equipe pequena.
+
+
+## Alternativa D: Monólito Modular
+
+A arquitetura **Monólito Modular** foi considerada porque permite organizar o sistema por capacidades de negócio, como gestão de chamados, equipamentos, usuários e departamentos e notificações. Cada módulo possui responsabilidades delimitadas e contratos de comunicação com os demais, mantendo o backend como uma única aplicação. Essa organização também pode utilizar camadas internamente.
+
+Para uma **versão completa do projeto, com todas as funcionalidades e evolução contínua, o monólito modular seria a escolha mais adequada entre as opções consideradas**. O crescimento das regras de atribuição, intervenções, encaminhamentos e notificações tornaria mais importante estabelecer limites entre essas responsabilidades. A modularização ajudaria a reduzir o impacto das alterações, facilitar testes por capacidade de negócio e distribuir o desenvolvimento entre os integrantes. Esses benefícios seriam obtidos sem a complexidade operacional dos microsserviços, preservando a implantação única e a possibilidade de utilizar transações locais.
+
+Entretanto, **no contexto da implementação deste trabalho, escolhemos um monólito organizado em quatro camadas**, sem estabelecer módulos de negócio independentes. O protótipo implementa uma fatia funcional concentrada na abertura e consulta de chamados e no processamento de notificações. Para esse escopo, as camadas de apresentação, aplicação, domínio e infraestrutura já permitem separar as responsabilidades, demonstrar inversão de dependências e isolar o acesso ao banco e ao serviço de e-mail.
+
+Adotar módulos exigiria definir contratos internos, determinar quais dados pertencem a cada capacidade e controlar as dependências entre elas. Considerando a equipe de três integrantes, o tempo disponível e a quantidade de funcionalidades implementadas, esse esforço adicional teria um benefício limitado para a demonstração. A prioridade foi garantir coerência entre requisitos, regras de negócio, persistência, auditoria e notificações.
+
+Portanto, **o monólito modular não foi descartado por inadequação ao problema, mas adiado por uma questão de escopo e prioridade**. O monólito em camadas mantém a implementação compreensível e permite demonstrar as decisões arquiteturais exigidas. Com a ampliação das funcionalidades, a modularização poderá ser incorporada, exigindo a definição explícita das fronteiras e dos contratos entre as capacidades de negócio.
