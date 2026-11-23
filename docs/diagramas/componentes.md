@@ -2,7 +2,7 @@
 
 Arquitetura: **cliente-servidor + monólito + camadas**, com inversão de dependências por interfaces de persistência e notificação.
 
-O protótipo implementa o UC01 (registrar chamado), o UC02 (consultar chamados) e o UC09 (reenviar notificações). O diagrama mostra o projeto completo. As telas React ainda não existem; por enquanto a API é usada pela página `/docs`.
+O protótipo implementa o UC01 (registrar chamado), o UC02 (consultar chamados) e o UC09 (reenviar notificações). O diagrama mostra o projeto completo. As telas React `TelaAbrirChamado` e `TelaListaChamados` ficam em `frontend/`.
 
 ## Como ler
 
