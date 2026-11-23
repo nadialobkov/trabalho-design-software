@@ -137,7 +137,7 @@ Nesse fluxo, a passagem direta de Aberto para Concluído deve ser impedida. A co
 
 ### ASR01 — Rastreabilidade do histórico de manutenção
 
-O sistema deve manter registros de auditoria das alterações de estado, prioridade, atribuição de técnicos e departamento responsável, bem como dos registros e alterações de diagnósticos e intervenções. Cada registro deve identificar o chamado, o autor, a data e hora e, quando aplicável, os valores anteriores e posteriores à alteração.
+O sistema deve manter registros de auditoria das alterações de estado, prioridade, atribuição de técnicos e departamento responsável, bem como dos registros e alterações de diagnósticos e intervenções relacionados aos equipamentos. Cada registro deve identificar o chamado, o autor, a data e hora e, quando aplicável, os valores anteriores e posteriores à alteração.
 
 Alterações posteriores não devem apagar os registros necessários para reconstruir a sequência dos acontecimentos.
 
