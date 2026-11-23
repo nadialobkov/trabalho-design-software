@@ -1,6 +1,6 @@
 # Diagrama de classes
 
-O protótipo implementa **UC01 (registrar chamado)**, **UC02 (consultar chamados)** e **UC09 (reenviar notificações)**. Os casos **UC03 a UC08** e as telas React fazem parte do projeto. A interface disponível no protótipo é a página `/docs` da API.
+O protótipo implementa **UC01 (registrar chamado)**, **UC02 (consultar chamados)** e **UC09 (reenviar notificações)**. Os casos **UC03 a UC08** fazem parte do projeto. As telas React `TelaAbrirChamado` (UC01) e `TelaListaChamados` (UC02) ficam em `frontend/`.
 
 - [Apresentação e aplicação](#apresentação-e-aplicação) — entradas, casos de uso e permissões.
 - [Domínio](#domínio) — entidades, relacionamentos e regras de negócio.
@@ -16,10 +16,10 @@ classDiagram
 
     namespace Apresentacao {
         class TelaAbrirChamado {
-            <<React planejada>>
+            <<React>>
         }
         class TelaListaChamados {
-            <<React planejada>>
+            <<React>>
         }
         class ManutencaoController {
             +post_chamados()
