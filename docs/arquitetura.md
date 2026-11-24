@@ -73,7 +73,7 @@ O envio de e-mail é separado da operação que modifica o chamado. A aplicaçã
 
 Essa separação impede que a indisponibilidade do e-mail desfaça uma abertura ou conclusão já registrada. As pendências persistidas podem ser retomadas após reinício da aplicação.
 
-A política de envio prevê até cinco tentativas. Antes desse limite, uma falha mantém a notificação pendente; ao atingi-lo, ela passa para `FALHOU` e deixa de ser reenviada automaticamente. Essa política preserva o registro da falha, mas limita a recuperação automática a indisponibilidades superadas antes do esgotamento das tentativas.
+A política de envio faz até cinco tentativas seguidas a cada rodada. Se todas falharem, a notificação continua pendente e volta a ser tentada na rodada seguinte, sem limite. Assim, uma indisponibilidade de qualquer duração é superada automaticamente quando o serviço volta, e o número de tentativas fica registrado.
 
 A autorização é verificada no serviço de aplicação com base no usuário identificado, seu papel, departamento e relação com o chamado. O solicitante consulta seus próprios chamados; técnicos e coordenadores consultam os chamados de seu departamento. Operações de atendimento exigem as permissões correspondentes, como a atribuição do técnico responsável pela conclusão. Identificar um usuário e verificar sua autorização são responsabilidades distintas da comprovação de sua identidade por autenticação.
 

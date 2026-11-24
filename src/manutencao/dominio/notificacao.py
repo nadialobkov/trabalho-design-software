@@ -10,16 +10,17 @@ class Notificacao:
     class Status(StrEnum):
         PENDENTE = "PENDENTE"
         ENVIADA = "ENVIADA"
-        FALHOU = "FALHOU"
 
-    # Limite de falhas de envio antes de encerrar as tentativas (ASR03).
-    MAX_TENTATIVAS: ClassVar[int] = 5
+    # Envios seguidos em cada rodada do agendador. Se todos falharem, a
+    # notificação continua PENDENTE e a próxima rodada tenta de novo (ASR03).
+    TENTATIVAS_POR_RODADA: ClassVar[int] = 5
 
     chamado: Chamado
     destinatario: str
     assunto: str = ""
     mensagem: str = ""
     status: Status = Status.PENDENTE
+    # Total de falhas desde a criação, somando todas as rodadas.
     tentativas: int = 0
     id: int | None = None
 
@@ -27,8 +28,6 @@ class Notificacao:
         self.status = self.Status.ENVIADA
 
     def registrar_falha(self) -> None:
+        # Uma falha nunca encerra o envio: a notificação espera o serviço voltar.
         self.tentativas += 1
-        if self.tentativas >= self.MAX_TENTATIVAS:
-            self.status = self.Status.FALHOU
-        else:
-            self.status = self.Status.PENDENTE
+        self.status = self.Status.PENDENTE

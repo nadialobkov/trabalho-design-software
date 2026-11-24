@@ -184,14 +184,6 @@ class ManutencaoService:
             valor_novo=str(prioridade),
         )
         self.repo.salvar_chamado(chamado, auditoria)
-        self._notificar_estado(
-            chamado,
-            tecnico,
-            assunto="Chamado em andamento",
-            mensagem_solicitante=f"Seu chamado #{chamado.id} está em andamento.",
-            mensagem_tecnico=f"Chamado #{chamado.id} está em andamento agora.",
-            mensagem_coordenador=f"O técnico {tecnico.nome} está resolvendo o chamado #{chamado.id}.",
-        )
         return chamado
 
     def iniciar_atendimento(self, usuario_id: int, chamado_id: int) -> Chamado:
@@ -219,15 +211,10 @@ class ManutencaoService:
         self._notificar_estado(
             chamado,
             tecnico,
-            assunto="Chamado concluído",
-            mensagem_solicitante=(
-                f"Seu chamado #{chamado.id} foi concluído. "
-                f"Intervenção: {chamado.descricao_intervencao}"
-            ),
-            mensagem_tecnico=f"Chamado #{chamado.id} concluído com sucesso.",
-            mensagem_coordenador=(
-                f"O técnico {tecnico.nome} concluiu o chamado #{chamado.id} com sucesso."
-            ),
+            assunto="Chamado em andamento",
+            mensagem_solicitante=f"Seu chamado #{chamado.id} está em andamento.",
+            mensagem_tecnico=f"Chamado #{chamado.id} está em andamento agora.",
+            mensagem_coordenador=f"O técnico {tecnico.nome} está resolvendo o chamado #{chamado.id}.",
         )
         return chamado
 
@@ -265,6 +252,19 @@ class ManutencaoService:
             valor_novo="CONCLUIDO",
         )
         self.repo.salvar_chamado(chamado, auditoria)
+        self._notificar_estado(
+            chamado,
+            tecnico,
+            assunto="Chamado concluído",
+            mensagem_solicitante=(
+                f"Seu chamado #{chamado.id} foi concluído. "
+                f"Intervenção: {chamado.descricao_intervencao}"
+            ),
+            mensagem_tecnico=f"Chamado #{chamado.id} concluído com sucesso.",
+            mensagem_coordenador=(
+                f"O técnico {tecnico.nome} concluiu o chamado #{chamado.id} com sucesso."
+            ),
+        )
         return chamado
 
     def listar_notificacoes(self, usuario_id: int) -> list[dict]:
@@ -409,8 +409,10 @@ class ManutencaoService:
         )
 
     def reenviar_notificacoes(self) -> None:
-        """Tenta enviar cada notificação pendente uma vez por rodada (UC09).
+        """Tenta enviar cada notificação pendente até TENTATIVAS_POR_RODADA vezes (UC09).
 
+        Se todas as tentativas da rodada falharem, a notificação continua PENDENTE
+        e volta a ser tentada na próxima rodada, até o envio dar certo (ASR03).
         O agendador chama este método em segundo plano, sem verificar permissões.
         """
         for notificacao in self.repo.listar_pendentes():
@@ -419,32 +421,29 @@ class ManutencaoService:
                 # reconstrói a mensagem com os dados do chamado para poder enviá-la (ASR03).
                 self._preencher_confirmacao(notificacao)
             tipo_falha = None
-            try:
-                self.notificador.enviar(notificacao)
-            except OSError as erro:
-                tipo_falha = type(erro).__name__
-                notificacao.registrar_falha()
-            else:
-                notificacao.marcar_enviada()
+            for _ in range(Notificacao.TENTATIVAS_POR_RODADA):
+                try:
+                    self.notificador.enviar(notificacao)
+                except OSError as erro:
+                    tipo_falha = type(erro).__name__
+                    notificacao.registrar_falha()
+                else:
+                    notificacao.marcar_enviada()
+                    break
             self.repo.atualizar_notificacao(notificacao)
 
-            if tipo_falha is None:
+            if notificacao.status == Notificacao.Status.ENVIADA:
                 logger.info(
                     "Notificação %s do chamado %s marcada como enviada.",
                     notificacao.id, notificacao.chamado.id,
                 )
             else:
-                nivel = (
-                    logging.ERROR
-                    if notificacao.status == Notificacao.Status.FALHOU
-                    else logging.WARNING
-                )
-                logger.log(
-                    nivel,
-                    "Falha no envio da notificação %s do chamado %s. Tentativa %d de %d. "
-                    "Estado %s. Tipo de erro %s.",
-                    notificacao.id, notificacao.chamado.id, notificacao.tentativas,
-                    Notificacao.MAX_TENTATIVAS, notificacao.status, tipo_falha,
+                logger.warning(
+                    "Falha no envio da notificação %s do chamado %s. "
+                    "%d tentativas nesta rodada, %d no total. Tipo de erro %s. "
+                    "Continua PENDENTE e será tentada de novo na próxima rodada.",
+                    notificacao.id, notificacao.chamado.id,
+                    Notificacao.TENTATIVAS_POR_RODADA, notificacao.tentativas, tipo_falha,
                 )
 
     @staticmethod

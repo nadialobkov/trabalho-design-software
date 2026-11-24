@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from manutencao.aplicacao.filtros import FiltrosChamado
 from manutencao.aplicacao.interface_repositorio import ManutencaoRepositorio
@@ -136,7 +136,12 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
         self._equipamentos[e.id] = e
 
     @classmethod
-    def com_dados_de_exemplo(cls) -> "RepositorioEmMemoria":
+    def com_dados_de_exemplo(cls, com_chamados: bool = True) -> "RepositorioEmMemoria":
+        """Cria o repositório com os dados de banco/dados_exemplo.sql.
+
+        Com `com_chamados=False`, cadastra só departamentos, usuários e
+        equipamentos. Os testes usam essa opção para começar sem chamados.
+        """
         repo = cls()
         eletrica = Departamento(1, "Elétrica")
         optica = Departamento(2, "Óptica")
@@ -177,6 +182,9 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
         ):
             repo.adicionar_equipamento(equipamento)
 
+        if not com_chamados:
+            return repo
+
         exemplos = (
             (10, 1, "Osciloscópio apresenta ruído na tela", date(2026, 11, 20),
              Chamado.Prioridade.ALTA, Chamado.Estado.ATRIBUIDO, (2,)),
@@ -201,7 +209,7 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
                 descricao,
                 ocorrencia,
                 "Chamado fictício para demonstração.",
-                datetime(2026, 11, 22, 9, numero * 10),
+                datetime(2026, 11, 22, 9, 0) + timedelta(minutes=10 * numero),
             )
             chamado.prioridade = prioridade
             chamado.estado = estado

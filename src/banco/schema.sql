@@ -83,7 +83,7 @@ CREATE TABLE notificacao (
     assunto      TEXT NOT NULL DEFAULT '',
     mensagem     TEXT NOT NULL DEFAULT '',
     status       TEXT NOT NULL
-        CHECK (status IN ('PENDENTE', 'ENVIADA', 'FALHOU')),
+        CHECK (status IN ('PENDENTE', 'ENVIADA')),
     tentativas   INTEGER NOT NULL DEFAULT 0,
     -- Enquanto a reserva está vigente, as outras instâncias pulam esta notificação.
     -- NULL indica que ela está livre. Se a instância parar, a notificação

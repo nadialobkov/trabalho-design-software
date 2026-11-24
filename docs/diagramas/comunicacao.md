@@ -101,9 +101,9 @@ flowchart LR
     S -->|"5a* [sucesso]: marcar_enviada()<br/>5b* [OSError]: registrar_falha()"| N
 ```
 
-As mensagens 4, 5 e 6 se repetem para cada notificação retornada. `5a` e `5b` são alternativas: somente uma é executada em cada tentativa. A mensagem 6 ocorre após a atualização do estado do objeto, tanto no sucesso quanto na falha de envio tratada.
+As mensagens 4, 5 e 6 se repetem para cada notificação retornada. As mensagens 4 e 5 se repetem até cinco vezes seguidas por notificação (`TENTATIVAS_POR_RODADA`) e param no primeiro sucesso. `5a` e `5b` são alternativas: somente uma é executada em cada tentativa. A mensagem 6 ocorre uma vez por notificação, depois das tentativas, tanto no sucesso quanto na falha de envio tratada.
 
-`registrar_falha()` mantém `PENDENTE` antes de cinco falhas e define `FALHOU` quando esse limite é atingido. Mensagens em `FALHOU` permanecem armazenadas, mas não são selecionadas para novas tentativas automáticas.
+`registrar_falha()` sempre mantém `PENDENTE`. Se as cinco tentativas da rodada falharem, a notificação é selecionada de novo na rodada seguinte, sem limite, até o envio ser aceito.
 
 As reservas reduzem o processamento simultâneo e expiram após cinco minutos se não forem liberadas. Elas não eliminam a possibilidade de reenvio após uma falha entre a aceitação SMTP e o registro local do sucesso. Se a persistência do resultado falhar, o estado atualizado em memória não deve ser considerado confirmado no banco.
 
@@ -113,7 +113,7 @@ As reservas reduzem o processamento simultâneo e expiram após cinco minutos se
 |---|---|
 | ASR01 — Rastreabilidade | Auditoria criada junto à conclusão e salva na mesma transação |
 | ASR02 — Controle de acesso | Verificações anteriores à chamada de conclusão do domínio |
-| ASR03 — Confiabilidade das notificações | Persistência da pendência e processamento separado, respeitando o limite de tentativas |
+| ASR03 — Confiabilidade das notificações | Persistência da pendência e processamento separado, com novas rodadas até o envio ser aceito |
 | GRASP Controller e Information Expert | Serviço coordena; `Chamado` valida e executa seu comportamento |
 | Inversão de dependências | Serviço usa os contratos de repositório e notificador |
 

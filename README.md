@@ -104,7 +104,7 @@ cd src
 uv sync                                       # primeira vez: cria a pasta .venv
 cp .env.example .env                          # primeira vez: configurações locais (não vão para o git)
 docker compose up -d db mailpit               # só o banco e o Mailpit
-uv run fastapi dev src/manutencao/main.py --port 7555   # API em http://localhost:7555
+uv run fastapi dev manutencao/main.py --port 7555   # API em http://localhost:7555
 ```
 
 O `.env` diz onde estão o banco e o servidor de e-mail:

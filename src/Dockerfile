@@ -11,8 +11,8 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
-COPY manutencao ./src/manutencao
+COPY manutencao ./manutencao
 RUN uv sync --locked --no-dev
 
 EXPOSE 7555
-CMD ["uv", "run", "--no-sync", "fastapi", "run", "src/manutencao/main.py", "--host", "0.0.0.0", "--port", "7555"]
+CMD ["uv", "run", "--no-sync", "fastapi", "run", "manutencao/main.py", "--host", "0.0.0.0", "--port", "7555"]

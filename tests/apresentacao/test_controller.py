@@ -21,7 +21,7 @@ BODY = {
 @pytest.fixture
 def service() -> ManutencaoService:
     return ManutencaoService(
-        RepositorioEmMemoria.com_dados_de_exemplo(), NotificadorFake()
+        RepositorioEmMemoria.com_dados_de_exemplo(com_chamados=False), NotificadorFake()
     )
 
 
@@ -83,6 +83,10 @@ def test_requester_lists_only_own_open_tickets(client: TestClient) -> None:
         "descricao_problema": BODY["descricao_problema"],
         "data_ocorrencia": BODY["data_ocorrencia"],
         "data_abertura": created.json()["data_abertura"],
+        "data_inicio_atendimento": None,
+        "diagnostico": None,
+        "descricao_intervencao": None,
+        "data_conclusao": None,
     }]
 
 

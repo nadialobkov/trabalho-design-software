@@ -159,9 +159,9 @@ O sistema deve verificar a autorização em cada operação, considerando o pape
 
 ### ASR03 — Confiabilidade das notificações
 
-O registro e a conclusão de um chamado devem ser preservados mesmo quando o serviço de notificações estiver indisponível. O sistema deve registrar a notificação pendente e realizar novas tentativas de envio após o restabelecimento do serviço.
+O registro e a conclusão de um chamado devem ser preservados mesmo quando o serviço de notificações estiver indisponível. O sistema deve gravar a notificação como `PENDENTE` e tentar enviá-la periodicamente, com até cinco tentativas seguidas a cada rodada. Se todas falharem, a notificação continua `PENDENTE` e é tentada de novo na rodada seguinte, sem limite, até o envio ser aceito.
 
-**Critério de verificação:** ao registrar ou concluir um chamado durante uma indisponibilidade do serviço de notificações, o chamado deve permanecer salvo e a notificação deve continuar disponível para nova tentativa de envio.
+**Critério de verificação:** ao registrar ou concluir um chamado durante uma indisponibilidade do serviço de notificações, o chamado deve permanecer salvo e a notificação deve continuar `PENDENTE`, com o número de tentativas registrado. Quando o serviço voltar, em qualquer momento, a notificação deve ser enviada na rodada seguinte e passar para `ENVIADA`.
 
 **Impacto arquitetural:** exige tratar o registro ou a conclusão do chamado e a entrega da notificação de forma independente, preservando as notificações pendentes.
 

@@ -14,7 +14,7 @@ from manutencao.infraestrutura.repositorio_em_memoria import RepositorioEmMemori
 
 @pytest.fixture
 def repo() -> RepositorioEmMemoria:
-    return RepositorioEmMemoria.com_dados_de_exemplo()
+    return RepositorioEmMemoria.com_dados_de_exemplo(com_chamados=False)
 
 
 @pytest.fixture

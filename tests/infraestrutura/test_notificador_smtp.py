@@ -13,7 +13,7 @@ from manutencao.infraestrutura.repositorio_em_memoria import RepositorioEmMemori
 
 @pytest.fixture
 def notification() -> Notificacao:
-    repo = RepositorioEmMemoria.com_dados_de_exemplo()
+    repo = RepositorioEmMemoria.com_dados_de_exemplo(com_chamados=False)
     ticket = Chamado.abrir(
         repo.buscar_equipamento(12), repo.buscar_usuario(1), "Will not turn on",
         date(2026, 11, 10), "", datetime(2026, 11, 13, 10, 30),

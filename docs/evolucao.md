@@ -70,7 +70,7 @@ A fila de notificações no banco aumenta o cuidado com a migração: registros 
 - **ASR03:** notificações pendentes sobrevivem a reinícios e são selecionadas de forma coordenada pelos processadores.
 - **Compatibilidade:** identificadores, datas, enumerações e resultados das consultas mantêm o significado esperado pela aplicação.
 
-A substituição preserva a política existente de tentativas; não resolve, por si só, a limitação das mensagens que chegam ao estado `FALHOU`.
+A substituição preserva a política existente de tentativas: a notificação continua `PENDENTE` até ser enviada, e o novo mecanismo precisa apenas manter essa seleção das pendências.
 
 ## 3. Mudança B — Inclusão de um aplicativo mobile
 
@@ -153,8 +153,8 @@ O campo `destinatario` da tabela `notificacao` é um texto e pode guardar um nú
 ### 4.3. Elementos que podem permanecer inalterados
 
 - **Domínio do atendimento:** `Chamado`, `Equipamento`, `Departamento` e `RegistroAuditoria` não conhecem o canal de envio.
-- **Entidade `Notificacao`:** os estados `PENDENTE`, `ENVIADA` e `FALHOU` e o limite `MAX_TENTATIVAS` continuam válidos para qualquer canal.
-- **Casos de uso:** `reenviar_notificacoes()` continua chamando `notificador.enviar()` e registrando sucesso ou falha da mesma forma.
+- **Entidade `Notificacao`:** os estados `PENDENTE` e `ENVIADA` e as cinco tentativas por rodada (`TENTATIVAS_POR_RODADA`) continuam válidos para qualquer canal.
+- **Envio e registro do resultado:** `reenviar_notificacoes()` continua chamando `notificador.enviar()` e registrando sucesso ou falha da mesma forma.
 - **Transação de abertura:** o chamado, a auditoria e a notificação pendente continuam sendo salvos juntos; o envio continua fora dessa transação.
 - **Agendador:** `AgendadorNotificacoes` continua acionando o processamento a cada dez segundos.
 - **Controller, esquemas HTTP e telas React:** a API e as telas não dependem do canal de notificação.
@@ -162,9 +162,9 @@ O campo `destinatario` da tabela `notificacao` é um texto e pode guardar um nú
 
 ### 4.4. Decisões que ajudam a mudança
 
-A **inversão de dependências** faz `ManutencaoService` conhecer apenas a interface `Notificador`, e não o SMTP. O **polimorfismo** permite que `WhatsAppNotificador` substitua `SmtpNotificador` sem alterar quem o utiliza. A **injeção pelo construtor** concentra essa escolha em `main.py`.
+A **inversão de dependências** permite que `ManutencaoService` faça o envio pela interface `Notificador`. O **polimorfismo** permite usar `WhatsAppNotificador` na mesma chamada de envio. A **injeção pelo construtor** concentra essa escolha em `main.py`.
 
-O **envio assíncrono com fila no banco** (ASR03) também ajuda: se a API do WhatsApp estiver indisponível, o chamado continua sendo registrado, e a notificação permanece pendente até um novo envio, exatamente como ocorre hoje com o SMTP.
+Com o **envio assíncrono e a fila no banco** (ASR03), o chamado continua sendo registrado durante uma indisponibilidade da API do WhatsApp. A notificação permanece pendente e é tentada a cada rodada, até ser enviada.
 
 ### 4.5. Decisões que dificultam ou exigem atenção
 
@@ -172,7 +172,7 @@ O modelo de notificação foi pensado para e-mail. O destinatário vem do e-mail
 
 O contrato de `Notificador` só trata `OSError` como falha. Uma biblioteca HTTP que lance outros tipos de erro precisa ter esses erros convertidos dentro de `WhatsAppNotificador`. Caso contrário, a implementação não seria uma substituição equivalente (LSP), e uma falha poderia interromper o processamento das demais notificações.
 
-A política atual trata todas as falhas da mesma forma: até cinco tentativas. Com o WhatsApp, existem falhas permanentes, como número inválido, que não melhoram com novas tentativas, e limites de envio impostos pelo provedor. Diferenciar esses casos exigiria ampliar o contrato ou a entidade `Notificacao`.
+A política atual trata todas as falhas da mesma forma: a notificação continua pendente e é tentada de novo a cada rodada, sem limite. Com o WhatsApp, existem falhas permanentes, como número inválido, que não melhoram com novas tentativas e ficariam pendentes para sempre, e limites de envio impostos pelo provedor. Diferenciar esses casos exigiria ampliar o contrato ou a entidade `Notificacao`.
 
 Se a universidade quiser **manter os dois canais** ao mesmo tempo, a mudança é maior: `Notificacao` precisaria registrar o canal, o usuário precisaria indicar sua preferência e seria necessário um notificador que escolha a implementação adequada para cada mensagem.
 
@@ -180,7 +180,7 @@ Se a universidade quiser **manter os dois canais** ao mesmo tempo, a mudança é
 
 - **ASR01:** a troca do canal não altera a auditoria das operações do chamado.
 - **ASR02:** a troca do canal não altera as verificações de permissão, que continuam no serviço de aplicação.
-- **ASR03:** com a API do WhatsApp indisponível, o chamado é registrado, a notificação fica `PENDENTE` e é reenviada depois; após `MAX_TENTATIVAS` falhas, passa para `FALHOU`.
+- **ASR03:** com a API do WhatsApp indisponível, o chamado é registrado e a notificação fica `PENDENTE`, sendo tentada a cada rodada até a API voltar e o envio ser aceito.
 - **Compatibilidade:** notificações pendentes criadas antes da troca, com endereços de e-mail como destinatário, precisam ser enviadas, convertidas ou encerradas de forma planejada.
 
 ## 5. Síntese dos impactos
@@ -189,6 +189,6 @@ Se a universidade quiser **manter os dois canais** ao mesmo tempo, a mudança é
 |---|---|---|---|
 | PostgreSQL para outro banco relacional | Infraestrutura, esquema, dados, configuração e testes de integração | Domínio, casos de uso e clientes, se os contratos forem mantidos | A nova persistência precisa reproduzir transações, auditoria e coordenação das pendências |
 | Inclusão de aplicativo mobile | Apresentação, cliente HTTP, conectividade e identificação; API quando necessário | Casos de uso existentes, domínio, persistência e envio de e-mails | A API cobre apenas as funções disponíveis e a identidade simulada precisa ser revista para uso real |
-| E-mail para WhatsApp | Nova implementação de `Notificador`, configuração, telefone do usuário e formato da mensagem | Domínio do atendimento, `Notificacao`, casos de uso, agendador, API e telas | O modelo de notificação foi pensado para e-mail; manter os dois canais exigiria ampliá-lo |
+| E-mail para WhatsApp | Nova implementação de `Notificador`, configuração, telefone do usuário e preparação da mensagem no serviço de aplicação | Domínio do atendimento, fila, política de tentativas, agendador, API e telas | A verificação de mensagem pronta depende do assunto do e-mail. Manter os dois canais exigiria ampliar o modelo de notificação |
 
 A organização em camadas e o uso de contratos reduzem a propagação das mudanças, mas não tornam qualquer substituição automática. A evolução deve preservar o significado das operações e suas garantias de rastreabilidade, autorização e recuperação, além de adaptar os detalhes técnicos específicos da tecnologia ou do cliente introduzido.

@@ -14,7 +14,7 @@ from manutencao.infraestrutura.repositorio_em_memoria import RepositorioEmMemori
 
 @pytest.fixture
 def repo() -> RepositorioEmMemoria:
-    return RepositorioEmMemoria.com_dados_de_exemplo()
+    return RepositorioEmMemoria.com_dados_de_exemplo(com_chamados=False)
 
 
 @pytest.fixture
@@ -25,6 +25,14 @@ def notifier() -> NotificadorFake:
 @pytest.fixture
 def service(repo: RepositorioEmMemoria, notifier: NotificadorFake) -> ManutencaoService:
     return ManutencaoService(repo, notifier)
+
+
+def confirmation(repo: RepositorioEmMemoria) -> Notificacao:
+    """Returns Ana's confirmation e-mail. Opening also queues one per coordinator."""
+    [notification] = [
+        n for n in repo.listar_pendentes() if n.destinatario == "ana@example.com"
+    ]
+    return notification
 
 
 def test_open_ticket_saves_audit_and_pending_confirmation(
@@ -48,17 +56,20 @@ def test_open_ticket_saves_audit_and_pending_confirmation(
     assert (audit.campo, audit.valor_anterior, audit.valor_novo) == ("estado", None, "ABERTO")
     # A abertura coloca o e-mail na fila para envio posterior.
     assert notifier.enviadas == []
-    [notification] = repo.listar_pendentes()
+    pending = repo.listar_pendentes()
+    # Ana gets the confirmation; Helena, the Optics coordinator, gets a notice.
+    assert [n.destinatario for n in pending] == ["ana@example.com", "helena@example.com"]
+    notification = pending[0]
     assert notification.chamado is ticket
     assert notification.id == 1
     assert notification.destinatario == "ana@example.com"
     assert notification.status == Notificacao.Status.PENDENTE
     assert notification.tentativas == 0
-    assert notification.assunto == f"Chamado #{ticket.id} registrado"
+    assert notification.assunto == f"Chamado #{ticket.id} registrado com sucesso"
     assert notification.mensagem == (
         "Olá, Ana.\n"
         "\n"
-        f"Seu chamado #{ticket.id} foi registrado.\n"
+        f"Seu chamado #{ticket.id} foi registrado com sucesso.\n"
         "\n"
         "Equipamento: Microscópio (Laboratório de Biologia)\n"
         "Problema: Will not turn on\n"
@@ -73,17 +84,17 @@ def test_resend_sends_pending_notifications(
     service: ManutencaoService, repo: RepositorioEmMemoria, notifier: NotificadorFake
 ) -> None:
     service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
-    [notification] = repo.listar_pendentes()
+    pending = repo.listar_pendentes()
 
     service.reenviar_notificacoes()
 
-    assert notifier.enviadas == [notification]
-    assert notification.status == Notificacao.Status.ENVIADA
+    assert notifier.enviadas == pending
+    assert all(n.status == Notificacao.Status.ENVIADA for n in pending)
     assert repo.listar_pendentes() == []
 
     service.reenviar_notificacoes()
 
-    assert notifier.enviadas == [notification]
+    assert notifier.enviadas == pending
 
 
 def test_missing_equipment_saves_nothing(
@@ -113,27 +124,29 @@ def test_unknown_user_is_rejected(
     assert notifier.enviadas == []
 
 
-def test_send_failure_keeps_notification_pending_until_retry_limit(
+def test_send_failure_keeps_notification_pending_until_service_returns(
     repo: RepositorioEmMemoria,
 ) -> None:
     notifier = NotificadorFake(falhar=True)
     service = ManutencaoService(repo, notifier)
     ticket = service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
-    [notification] = repo.listar_pendentes()
+    notification = confirmation(repo)
 
-    service.reenviar_notificacoes()
+    # Several rounds with the e-mail service down: each round tries 5 times.
+    for _ in range(3):
+        service.reenviar_notificacoes()
 
     assert repo.buscar_chamado(ticket.id) is ticket
     assert notification.status == Notificacao.Status.PENDENTE
-    assert notification.tentativas == 1
-
-    for _ in range(Notificacao.MAX_TENTATIVAS - 1):
-        service.reenviar_notificacoes()
-
-    assert notification.status == Notificacao.Status.FALHOU
-    assert notification.tentativas == Notificacao.MAX_TENTATIVAS
-    assert repo.listar_pendentes() == []
+    assert notification.tentativas == Notificacao.TENTATIVAS_POR_RODADA * 3
     assert notifier.enviadas == []
+
+    # The service comes back: the next round sends it.
+    notifier.falhar = False
+    service.reenviar_notificacoes()
+
+    assert notification.status == Notificacao.Status.ENVIADA
+    assert notification in notifier.enviadas
 
 
 def test_resend_rebuilds_notification_without_text(
@@ -141,15 +154,15 @@ def test_resend_rebuilds_notification_without_text(
 ) -> None:
     # Simula a interrupção da aplicação entre a gravação do chamado e a do texto.
     ticket = service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
-    [notification] = repo.listar_pendentes()
+    notification = confirmation(repo)
     texto_original = notification.mensagem
     notification.assunto = ""
     notification.mensagem = ""
 
     service.reenviar_notificacoes()
 
-    assert notifier.enviadas == [notification]
-    assert notification.assunto == f"Chamado #{ticket.id} registrado"
+    assert notification in notifier.enviadas
+    assert notification.assunto == f"Chamado #{ticket.id} registrado com sucesso"
     assert notification.mensagem == texto_original
     assert notification.status == Notificacao.Status.ENVIADA
 
@@ -167,18 +180,18 @@ def test_requester_sees_own_tickets_without_changing_filters(
     assert service.consultar_chamados(1, FiltrosChamado(solicitante_id=5)) == []
 
 
-@pytest.mark.parametrize("user_id", [2, 3, 4])
-def test_staff_only_see_their_department_without_changing_filters(
+@pytest.mark.parametrize("user_id", [3, 7])
+def test_coordinators_only_see_their_department_without_changing_filters(
     service: ManutencaoService, user_id: int,
 ) -> None:
     electrical_ticket = service.abrir_chamado(1, 10, "No signal", date(2026, 11, 10))
     optics_ticket = service.abrir_chamado(5, 12, "Blurry image", date(2026, 11, 10))
-    expected = optics_ticket if user_id == 4 else electrical_ticket
+    expected = optics_ticket if user_id == 7 else electrical_ticket
     filters = FiltrosChamado()
 
     assert service.consultar_chamados(user_id, filters) == [expected]
     assert filters == FiltrosChamado()
-    other_department = 1 if user_id == 4 else 2
+    other_department = 1 if user_id == 7 else 2
     assert service.consultar_chamados(
         user_id, FiltrosChamado(departamento_id=other_department)
     ) == []

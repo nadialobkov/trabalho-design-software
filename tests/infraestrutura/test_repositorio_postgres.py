@@ -20,7 +20,7 @@ from manutencao.infraestrutura.repositorio_postgres import PostgresManutencaoRep
 
 
 URL = os.environ.get("TEST_DATABASE_URL")
-BANCO = Path(__file__).resolve().parents[2] / "banco"
+BANCO = Path(__file__).resolve().parents[2] / "src" / "banco"
 
 pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL is not set")
 
@@ -31,6 +31,11 @@ def repo() -> PostgresManutencaoRepositorio:
     with psycopg.connect(URL) as conn:
         conn.execute((BANCO / "schema.sql").read_text(encoding="utf-8"))
         conn.execute((BANCO / "dados_exemplo.sql").read_text(encoding="utf-8"))
+        # Os testes começam sem chamados; mantêm departamentos, usuários e equipamentos.
+        conn.execute(
+            "TRUNCATE chamado_tecnico, notificacao, registro_auditoria, chamado"
+            " RESTART IDENTITY"
+        )
     return PostgresManutencaoRepositorio(URL)
 
 
@@ -67,9 +72,11 @@ def test_open_ticket_saves_ticket_audit_and_pending_notification(
     assert saved.diagnostico is None
     [audit] = repo.listar_auditoria(ticket.id)
     assert (audit.campo, audit.valor_novo, audit.autor.id) == ("estado", "ABERTO", 1)
-    [notification] = repo.listar_pendentes()
-    assert notification.chamado.id == ticket.id
-    assert notification.assunto == f"Chamado #{ticket.id} registrado"
+    # Ana gets the confirmation; Helena, the Optics coordinator, gets a notice.
+    pending = repo.listar_pendentes()
+    assert [n.destinatario for n in pending] == ["ana@example.com", "helena@example.com"]
+    assert all(n.chamado.id == ticket.id for n in pending)
+    assert pending[0].assunto == f"Chamado #{ticket.id} registrado com sucesso"
 
 
 def test_resend_marks_notification_as_sent(
@@ -79,7 +86,7 @@ def test_resend_marks_notification_as_sent(
 
     service.reenviar_notificacoes()
 
-    assert len(notifier.enviadas) == 1
+    assert len(notifier.enviadas) == 2
     assert repo.listar_pendentes() == []
 
 
@@ -132,7 +139,8 @@ def test_two_instances_never_get_the_same_pending_notification(
     service.abrir_chamado(1, 12, "Will not turn on", date(2026, 11, 10))
     other_instance = PostgresManutencaoRepositorio(URL)
 
-    [notification] = repo.listar_pendentes()
+    # Opening queues Ana's confirmation and the coordinator notice; both get reserved.
+    notification, _ = repo.listar_pendentes()
     assert other_instance.listar_pendentes() == []
 
     # A falha mantém a notificação pendente e a libera para a próxima rodada.

@@ -148,7 +148,7 @@ Todas as entidades têm `id`. Os atributos que representam vínculos também apa
 | `Equipamento` | Identificação e localização | `nome`, `laboratorio`, `departamento` |
 | `Usuario` | Identificação e papel | `nome`, `email`, `papel`, `departamento` |
 | `Departamento` | Identificação | `nome` |
-| `Notificacao` | Mensagem e envio | `chamado`, `destinatario`, `assunto`, `mensagem`, `status`, `tentativas`, `MAX_TENTATIVAS` (constante) |
+| `Notificacao` | Mensagem e envio | `chamado`, `destinatario`, `assunto`, `mensagem`, `status`, `tentativas`, `TENTATIVAS_POR_RODADA` (constante) |
 | `RegistroAuditoria` | Alteração registrada | `chamado`, `autor`, `data_hora`, `campo`, `valor_anterior`, `valor_novo`, `observacao` |
 
 As enumerações ficam dentro das próprias classes do domínio.
@@ -158,7 +158,7 @@ As enumerações ficam dentro das próprias classes do domínio.
 | `Chamado.Estado` | `estado` | `ABERTO`, `ATRIBUIDO`, `EM_ATENDIMENTO`, `CONCLUIDO` |
 | `Chamado.Prioridade` | `prioridade` | `BAIXA`, `MEDIA`, `ALTA`, `CRITICA` |
 | `Usuario.Papel` | `papel` | `SOLICITANTE`, `TECNICO`, `COORDENADOR` |
-| `Notificacao.Status` | `status` | `PENDENTE`, `ENVIADA`, `FALHOU` |
+| `Notificacao.Status` | `status` | `PENDENTE`, `ENVIADA` |
 
 ### Operações e regras
 
@@ -171,7 +171,7 @@ As enumerações ficam dentro das próprias classes do domínio.
 | `Chamado.concluir()` | Planejada | Exige diagnóstico, descrição da intervenção e o estado `EM_ATENDIMENTO`. Muda o estado para `CONCLUIDO`. | RF07, RN03 |
 | `Chamado.encaminhar()` | Planejada | Troca o departamento responsável. A justificativa fica em `RegistroAuditoria.observacao`. | RF09 |
 | `Usuario.e_tecnico()` e `e_coordenador_de()` | Implementadas | Consultam o papel do usuário e, no segundo caso, seu departamento. São operações de apoio às verificações planejadas para UC03 a UC08. | RN02, ASR02 |
-| `Notificacao.marcar_enviada()` e `registrar_falha()` | Implementadas | Atualizam o estado da notificação. Cada falha incrementa as tentativas e, ao atingir o limite, a notificação passa para `FALHOU`. | ASR03 |
+| `Notificacao.marcar_enviada()` e `registrar_falha()` | Implementadas | Atualizam o estado da notificação. Cada falha incrementa as tentativas e mantém a notificação `PENDENTE`, sem limite. | ASR03 |
 
 ## Infraestrutura
 
@@ -192,4 +192,4 @@ A aplicação define as interfaces em `aplicacao/interface_repositorio.py` e `ap
 1. **Gravação (ASR01 e ASR03).** No PostgreSQL, `salvar_chamado(chamado, auditoria, notificacao)` grava o chamado, a auditoria e a notificação `PENDENTE` em uma única transação.
 2. **Preparação (RF08).** Depois de obter o ID do chamado, `abrir_chamado()` usa o método privado `_preencher_confirmacao(notificacao)` para montar o assunto e a mensagem. A notificação de abertura fica reservada no PostgreSQL até a gravação do texto. Se a aplicação parar após salvar o chamado, o reenvio recompõe o texto a partir dos dados gravados.
 3. **Envio (UC09).** O agendador chama `reenviar_notificacoes()`, que busca as pendências e tenta enviá-las por meio de `Notificador.enviar()`. No PostgreSQL, `listar_pendentes()` ignora reservas ativas e reserva as mensagens que devolve usando `FOR UPDATE SKIP LOCKED`. `atualizar_notificacao()` libera a reserva. Em caso de interrupção, ela vence em 5 minutos (`reservada_ate`).
-4. **Resultado (ASR03).** Um envio aceito passa a `ENVIADA`. Se o envio falhar, a notificação fica `PENDENTE` até atingir `Notificacao.MAX_TENTATIVAS` (5). Depois disso, fica armazenada como `FALHOU` e sai do reenvio automático. Uma interrupção entre a aceitação pelo SMTP e a gravação do resultado pode causar um envio duplicado.
+4. **Resultado (ASR03).** Um envio aceito passa a `ENVIADA`. Cada rodada faz até `Notificacao.TENTATIVAS_POR_RODADA` (5) tentativas seguidas. Se todas falharem, a notificação continua `PENDENTE` e é tentada de novo na rodada seguinte, até o envio ser aceito. Uma interrupção entre a aceitação pelo SMTP e a gravação do resultado pode causar um envio duplicado.

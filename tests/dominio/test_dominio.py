@@ -77,16 +77,14 @@ def test_failed_notification_stays_pending_and_can_be_sent(ticket: Chamado) -> N
     assert notification.tentativas == 1
 
 
-def test_notification_fails_after_retry_limit(ticket: Chamado) -> None:
+def test_notification_stays_pending_after_many_failures(ticket: Chamado) -> None:
     notification = Notificacao(ticket, ticket.solicitante.email)
 
-    for _ in range(Notificacao.MAX_TENTATIVAS - 1):
+    for _ in range(Notificacao.TENTATIVAS_POR_RODADA * 3):
         notification.registrar_falha()
+
     assert notification.status == Notificacao.Status.PENDENTE
-
-    notification.registrar_falha()
-
-    assert notification.status == Notificacao.Status.FALHOU
+    assert notification.tentativas == Notificacao.TENTATIVAS_POR_RODADA * 3
 
 
 @pytest.mark.parametrize("role", list(Usuario.Papel))

@@ -18,18 +18,21 @@ BODY = {
 
 def test_scheduler_sends_pending_email_in_background() -> None:
     notifier = NotificadorFake()
-    service = ManutencaoService(RepositorioEmMemoria.com_dados_de_exemplo(), notifier)
+    service = ManutencaoService(RepositorioEmMemoria.com_dados_de_exemplo(com_chamados=False), notifier)
     scheduler = AgendadorNotificacoes(service, intervalo_segundos=0.01)
 
     with TestClient(criar_app(service, scheduler)) as client:
         response = client.post("/chamados", headers={"X-Usuario-Id": "1"}, json=BODY)
         assert response.status_code == 201
         deadline = time.monotonic() + 2
-        while not notifier.enviadas and time.monotonic() < deadline:
+        while len(notifier.enviadas) < 2 and time.monotonic() < deadline:
             time.sleep(0.01)
 
-    assert len(notifier.enviadas) == 1
-    assert notifier.enviadas[0].chamado.id == response.json()["id"]
+    # Ana's confirmation and the notice to Helena, the Optics coordinator.
+    assert [n.destinatario for n in notifier.enviadas] == [
+        "ana@example.com", "helena@example.com",
+    ]
+    assert all(n.chamado.id == response.json()["id"] for n in notifier.enviadas)
 
 
 class FlakyService:

@@ -158,25 +158,23 @@ sequenceDiagram
     R-->>S: Lista de notificações
 
     loop Para cada notificação retornada
-        S->>E: enviar(notificacao)
-        E->>SMTP: Enviar mensagem por SMTP
+        loop Até 5 tentativas seguidas (TENTATIVAS_POR_RODADA)
+            S->>E: enviar(notificacao)
+            E->>SMTP: Enviar mensagem por SMTP
 
-        alt Serviço aceita a mensagem
-            SMTP-->>E: Aceitação
-            E-->>S: Envio realizado
-            S->>N: marcar_enviada()
-            Note over N: status = ENVIADA
-        else Serviço indisponível ou erro no envio
-            SMTP-->>E: Falha ou ausência de resposta
-            E-->>S: OSError
-            S->>N: registrar_falha()
-            Note over N: Incrementa tentativas
-            alt Menos de 5 falhas
-                Note over N: status = PENDENTE<br/>Disponível para uma tentativa posterior
-            else Limite de 5 falhas atingido
-                Note over N: status = FALHOU<br/>Sem nova tentativa automática
+            alt Serviço aceita a mensagem
+                SMTP-->>E: Aceitação
+                E-->>S: Envio realizado
+                S->>N: marcar_enviada()
+                Note over N: status = ENVIADA<br/>Encerra as tentativas
+            else Serviço indisponível ou erro no envio
+                SMTP-->>E: Falha ou ausência de resposta
+                E-->>S: OSError
+                S->>N: registrar_falha()
+                Note over N: Incrementa tentativas<br/>status = PENDENTE
             end
         end
+        Note over S,N: Se as 5 tentativas falharem, a notificação<br/>continua PENDENTE e volta na próxima rodada
 
         S->>R: atualizar_notificacao(notificacao)
         R->>DB: Persistir status e tentativas<br/>e liberar a reserva
@@ -191,7 +189,7 @@ A seleção utiliza reservas temporárias para reduzir o processamento simultân
 
 O estado `ENVIADA` indica que o envio foi aceito pelo serviço SMTP, não que o solicitante leu a mensagem. Se a persistência do resultado falhar, não é possível considerar o estado atualizado no banco; o tratamento do agendador deve permitir rodadas posteriores.
 
-A política de cinco tentativas limita a recuperação automática. Uma mensagem em `FALHOU` permanece armazenada, mas não é selecionada por `listar_pendentes()`. Portanto, o fluxo não garante envio automático após indisponibilidades que esgotem esse limite.
+Não há limite de rodadas. Uma mensagem que falhou continua `PENDENTE` e é selecionada de novo por `listar_pendentes()` na rodada seguinte. Portanto, o envio acontece automaticamente quando o serviço volta, qualquer que seja a duração da indisponibilidade.
 
 ## 3. Relação com requisitos e responsabilidades
 
