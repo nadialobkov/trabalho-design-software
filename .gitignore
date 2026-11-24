@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+node_modules/
+dist/
+slides.md
+# Plano local de testes manuais, fora da entrega.
+test-trabalho.md
