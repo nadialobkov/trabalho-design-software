@@ -14,7 +14,7 @@ A arquitetura **Microsserviços** foi descartada logo no ínicio na discussão d
 
 O fato de nossa equipe atual ser de **três integrantes** dificulta ainda mais a implementação de um sistema de microsserviços, uma vez que este exige uma equipe maior e mais especializada em cada serviço.
 
-Por esses motivos, a escolha da arquitetura **Monólito** se viu mais adequada, pois é robusta, mais simples de implementar, tem os módulos bem organizados e é fácil depurar.
+Por esses motivos, a escolha da arquitetura **Monólito** se viu mais adequada, pois é robusta, mais simples de implementar, tem as camadas bem organizadas e é fácil depurar.
 
 
 ## Alternativa B: Data-Centered
