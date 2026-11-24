@@ -11,6 +11,7 @@ import {
 } from "../dados/catalogo.js";
 import { EtiquetaEstado, EtiquetaPrioridade } from "../componentes/Etiquetas.jsx";
 import Aviso from "../componentes/Aviso.jsx";
+import ModalChamado from "../componentes/ModalChamado.jsx";
 
 // Keys match the query parameters of GET /chamados (RF03).
 const FILTROS_VAZIOS = {
@@ -43,6 +44,7 @@ export default function TelaListaChamados({ usuario }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [chamadoSelecionado, setChamadoSelecionado] = useState(null);
 
   const carregar = useCallback(
     async (filtrosUsados) => {
@@ -85,7 +87,8 @@ export default function TelaListaChamados({ usuario }) {
   }));
 
   return (
-    <section className="cartao">
+    <main className="area-interna">
+    <section className="painel painel-lista">
       <header className="cartao-cabecalho cabecalho-lista">
         <div>
           <h2>Chamados</h2>
@@ -94,7 +97,7 @@ export default function TelaListaChamados({ usuario }) {
         <div className="acoes-topo">
           <button
             type="button"
-            className="botao botao-secundario"
+            className="botao-painel"
             aria-expanded={mostrarFiltros}
             onClick={() => setMostrarFiltros(!mostrarFiltros)}
           >
@@ -102,7 +105,7 @@ export default function TelaListaChamados({ usuario }) {
           </button>
           <button
             type="button"
-            className="botao botao-secundario"
+            className="botao-painel"
             onClick={() => carregar(filtros)}
             disabled={carregando}
           >
@@ -236,6 +239,7 @@ export default function TelaListaChamados({ usuario }) {
                   <th>Técnicos</th>
                   <th>Solicitante</th>
                   <th>Datas</th>
+                  <th>Mais ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -267,6 +271,15 @@ export default function TelaListaChamados({ usuario }) {
                       <span>Ocorreu em {formatarData(c.data_ocorrencia)}</span>
                       <span className="texto-suave">Aberto em {formatarDataHora(c.data_abertura)}</span>
                     </td>
+                    <td data-rotulo="Ações" className="col-acoes">
+                      <button
+                        type="button"
+                        className="botao-ver"
+                        onClick={() => setChamadoSelecionado(c)}
+                      >
+                        Ver chamado
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -275,5 +288,19 @@ export default function TelaListaChamados({ usuario }) {
         )
       )}
     </section>
+    {chamadoSelecionado && (
+      <ModalChamado
+        chamado={chamadoSelecionado}
+        usuario={usuario}
+        onFechar={() => setChamadoSelecionado(null)}
+        onAtualizado={(atualizado) => {
+          setChamadoSelecionado(atualizado);
+          setChamados((atuais) =>
+            atuais.map((item) => item.id === atualizado.id ? atualizado : item),
+          );
+        }}
+      />
+    )}
+    </main>
   );
 }

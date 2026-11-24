@@ -19,6 +19,7 @@ class Chamado:
         BAIXA = "BAIXA"
         MEDIA = "MEDIA"
         ALTA = "ALTA"
+        URGENTE = "URGENTE"
         CRITICA = "CRITICA"
 
     equipamento: Equipamento

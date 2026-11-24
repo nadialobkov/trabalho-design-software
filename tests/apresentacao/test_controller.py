@@ -160,3 +160,55 @@ def test_access_denied_returns_403(
 
     assert response.status_code == 403
     assert response.json() == {"erro": "Action not allowed."}
+
+
+def test_coordinator_assigns_technician_and_priority(client: TestClient) -> None:
+    created = client.post(
+        "/chamados",
+        headers={"X-Usuario-Id": "1"},
+        json={**BODY, "equipamento_id": 10},
+    )
+
+    assigned = client.patch(
+        f"/chamados/{created.json()['id']}/atribuicao",
+        headers={"X-Usuario-Id": "3"},
+        json={"tecnicos_ids": [2]},
+    )
+    prioritized = client.patch(
+        f"/chamados/{created.json()['id']}/prioridade",
+        headers={"X-Usuario-Id": "3"},
+        json={"prioridade": "URGENTE"},
+    )
+
+    assert assigned.status_code == 200
+    assert assigned.json()["estado"] == "ATRIBUIDO"
+    assert assigned.json()["tecnicos_ids"] == [2]
+    assert prioritized.status_code == 200
+    assert prioritized.json()["prioridade"] == "URGENTE"
+
+
+def test_technician_only_lists_assigned_tickets(client: TestClient) -> None:
+    first = client.post(
+        "/chamados",
+        headers={"X-Usuario-Id": "1"},
+        json={**BODY, "equipamento_id": 10},
+    )
+    second = client.post(
+        "/chamados",
+        headers={"X-Usuario-Id": "1"},
+        json={**BODY, "equipamento_id": 11},
+    )
+    client.patch(
+        f"/chamados/{first.json()['id']}/atribuicao",
+        headers={"X-Usuario-Id": "3"},
+        json={"tecnicos_ids": [2]},
+    )
+
+    response = client.get(
+        "/chamados",
+        headers={"X-Usuario-Id": "2"},
+    )
+
+    assert response.status_code == 200
+    assert [ticket["id"] for ticket in response.json()] == [first.json()["id"]]
+    assert second.json()["id"] not in [ticket["id"] for ticket in response.json()]

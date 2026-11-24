@@ -38,7 +38,7 @@ CREATE TABLE chamado (
     estado                  TEXT NOT NULL
         CHECK (estado IN ('ABERTO', 'ATRIBUIDO', 'EM_ATENDIMENTO', 'CONCLUIDO')),
     prioridade              TEXT
-        CHECK (prioridade IN ('BAIXA', 'MEDIA', 'ALTA', 'CRITICA')),
+        CHECK (prioridade IN ('BAIXA', 'MEDIA', 'ALTA', 'URGENTE', 'CRITICA')),
     data_inicio_atendimento TIMESTAMP,
     diagnostico             TEXT,
     descricao_intervencao   TEXT,

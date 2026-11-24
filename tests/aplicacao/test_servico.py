@@ -215,3 +215,49 @@ def test_staff_without_department_see_no_tickets(
 def test_unknown_action_is_denied(service: ManutencaoService) -> None:
     with pytest.raises(AcessoNegado):
         service._verificar_permissao(1, "unknown")
+
+
+def test_assigned_technician_starts_and_concludes_ticket(
+    service: ManutencaoService,
+) -> None:
+    ticket = service.abrir_chamado(1, 10, "No signal", date(2026, 11, 10))
+    service.atribuir_tecnicos(3, ticket.id, [2])
+
+    started = service.iniciar_atendimento(2, ticket.id)
+    assert started.estado == Chamado.Estado.EM_ATENDIMENTO
+    assert started.data_inicio_atendimento is not None
+
+    concluded = service.concluir_atendimento(
+        2,
+        ticket.id,
+        "Conector solto",
+        "Conector reinstalado e equipamento testado",
+    )
+    assert concluded.estado == Chamado.Estado.CONCLUIDO
+    assert concluded.concluido_por.id == 2
+    assert concluded.diagnostico == "Conector solto"
+    assert concluded.descricao_intervencao == "Conector reinstalado e equipamento testado"
+    assert concluded.data_conclusao is not None
+
+
+def test_unassigned_technician_cannot_change_status(
+    service: ManutencaoService,
+) -> None:
+    ticket = service.abrir_chamado(1, 10, "No signal", date(2026, 11, 10))
+    service.atribuir_tecnicos(3, ticket.id, [2])
+
+    with pytest.raises(AcessoNegado):
+        service.iniciar_atendimento(6, ticket.id)
+
+
+def test_conclusion_requires_diagnosis_and_intervention(
+    service: ManutencaoService,
+) -> None:
+    ticket = service.abrir_chamado(1, 10, "No signal", date(2026, 11, 10))
+    service.atribuir_tecnicos(3, ticket.id, [2])
+    service.iniciar_atendimento(2, ticket.id)
+
+    with pytest.raises(ValueError, match="Diagnosis"):
+        service.concluir_atendimento(2, ticket.id, "  ", "Replaced cable")
+    with pytest.raises(ValueError, match="Intervention"):
+        service.concluir_atendimento(2, ticket.id, "Damaged cable", " ")

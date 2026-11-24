@@ -73,7 +73,164 @@ class ManutencaoService:
             ):
                 return []
             filtros_restritos = replace(filtros, departamento_id=usuario.departamento.id)
+            if usuario.papel == Usuario.Papel.TECNICO:
+                if filtros.tecnico_id is not None and filtros.tecnico_id != usuario.id:
+                    return []
+                filtros_restritos = replace(
+                    filtros_restritos,
+                    departamento_id=usuario.departamento.id,
+                    tecnico_id=usuario.id,
+                )
         return self.repo.listar_chamados(filtros_restritos)
+
+    def atribuir_tecnicos(
+        self,
+        usuario_id: int,
+        chamado_id: int,
+        tecnicos_ids: list[int],
+    ) -> Chamado:
+        coordenador = self._verificar_permissao(usuario_id, "consultar")
+        chamado = self.repo.buscar_chamado(chamado_id)
+        if chamado is None:
+            raise AcessoNegado("Ticket not found.")
+        if (
+            coordenador.papel != Usuario.Papel.COORDENADOR
+            or coordenador.departamento is None
+            or coordenador.departamento.id != chamado.departamento.id
+        ):
+            raise AcessoNegado("Only the responsible coordinator may assign technicians.")
+        if chamado.estado != Chamado.Estado.ABERTO:
+            raise ValueError("Only open tickets can be assigned.")
+        if not tecnicos_ids:
+            raise ValueError("At least one technician must be selected.")
+
+        tecnicos = []
+        for tecnico_id in tecnicos_ids:
+            tecnico = self.repo.buscar_usuario(tecnico_id)
+            if (
+                tecnico is None
+                or tecnico.papel != Usuario.Papel.TECNICO
+                or tecnico.departamento is None
+                or tecnico.departamento.id != chamado.departamento.id
+            ):
+                raise AcessoNegado("Technician is not authorized for this department.")
+            tecnicos.append(tecnico)
+
+        anteriores = ",".join(str(tecnico.id) for tecnico in chamado.tecnicos)
+        novos = ",".join(str(tecnico.id) for tecnico in tecnicos)
+        chamado.tecnicos = tecnicos
+        chamado.estado = Chamado.Estado.ATRIBUIDO
+        agora = datetime.now()
+        auditoria = RegistroAuditoria(
+            chamado,
+            coordenador,
+            agora,
+            campo="tecnicos",
+            valor_anterior=anteriores or None,
+            valor_novo=novos,
+        )
+        self.repo.salvar_chamado(chamado, auditoria)
+        return chamado
+
+    def definir_prioridade(
+        self,
+        usuario_id: int,
+        chamado_id: int,
+        prioridade: Chamado.Prioridade,
+    ) -> Chamado:
+        coordenador = self._verificar_permissao(usuario_id, "consultar")
+        chamado = self.repo.buscar_chamado(chamado_id)
+        if chamado is None:
+            raise AcessoNegado("Ticket not found.")
+        if (
+            coordenador.papel != Usuario.Papel.COORDENADOR
+            or coordenador.departamento is None
+            or coordenador.departamento.id != chamado.departamento.id
+        ):
+            raise AcessoNegado("Only the responsible coordinator may change priority.")
+
+        anterior = str(chamado.prioridade) if chamado.prioridade else None
+        chamado.prioridade = prioridade
+        agora = datetime.now()
+        auditoria = RegistroAuditoria(
+            chamado,
+            coordenador,
+            agora,
+            campo="prioridade",
+            valor_anterior=anterior,
+            valor_novo=str(prioridade),
+        )
+        self.repo.salvar_chamado(chamado, auditoria)
+        return chamado
+
+    def iniciar_atendimento(self, usuario_id: int, chamado_id: int) -> Chamado:
+        tecnico = self._verificar_permissao(usuario_id, "consultar")
+        chamado = self.repo.buscar_chamado(chamado_id)
+        if chamado is None:
+            raise AcessoNegado("Ticket not found.")
+        if not self._tecnico_responsavel(tecnico, chamado):
+            raise AcessoNegado("Only an assigned technician may start this ticket.")
+        if chamado.estado != Chamado.Estado.ATRIBUIDO:
+            raise ValueError("Only assigned tickets can be started.")
+
+        chamado.estado = Chamado.Estado.EM_ATENDIMENTO
+        chamado.data_inicio_atendimento = datetime.now()
+        agora = chamado.data_inicio_atendimento
+        auditoria = RegistroAuditoria(
+            chamado,
+            tecnico,
+            agora,
+            campo="estado",
+            valor_anterior="ATRIBUIDO",
+            valor_novo="EM_ATENDIMENTO",
+        )
+        self.repo.salvar_chamado(chamado, auditoria)
+        return chamado
+
+    def concluir_atendimento(
+        self,
+        usuario_id: int,
+        chamado_id: int,
+        diagnostico: str,
+        descricao_intervencao: str,
+    ) -> Chamado:
+        tecnico = self._verificar_permissao(usuario_id, "consultar")
+        chamado = self.repo.buscar_chamado(chamado_id)
+        if chamado is None:
+            raise AcessoNegado("Ticket not found.")
+        if not self._tecnico_responsavel(tecnico, chamado):
+            raise AcessoNegado("Only an assigned technician may conclude this ticket.")
+        if chamado.estado != Chamado.Estado.EM_ATENDIMENTO:
+            raise ValueError("Only tickets in attendance can be concluded.")
+        if not diagnostico.strip():
+            raise ValueError("Diagnosis must not be empty.")
+        if not descricao_intervencao.strip():
+            raise ValueError("Intervention description must not be empty.")
+
+        chamado.diagnostico = diagnostico.strip()
+        chamado.descricao_intervencao = descricao_intervencao.strip()
+        chamado.estado = Chamado.Estado.CONCLUIDO
+        chamado.concluido_por = tecnico
+        chamado.data_conclusao = datetime.now()
+        auditoria = RegistroAuditoria(
+            chamado,
+            tecnico,
+            chamado.data_conclusao,
+            campo="estado",
+            valor_anterior="EM_ATENDIMENTO",
+            valor_novo="CONCLUIDO",
+        )
+        self.repo.salvar_chamado(chamado, auditoria)
+        return chamado
+
+    @staticmethod
+    def _tecnico_responsavel(tecnico: Usuario, chamado: Chamado) -> bool:
+        return (
+            tecnico.papel == Usuario.Papel.TECNICO
+            and tecnico.departamento is not None
+            and tecnico.departamento.id == chamado.departamento.id
+            and any(responsavel.id == tecnico.id for responsavel in chamado.tecnicos)
+        )
 
     def reenviar_notificacoes(self) -> None:
         """Tenta enviar cada notificação pendente uma vez por rodada (UC09).

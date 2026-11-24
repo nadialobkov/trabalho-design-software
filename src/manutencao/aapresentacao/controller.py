@@ -13,7 +13,10 @@ from manutencao.aplicacao.servico import ManutencaoService
 from manutencao.aapresentacao.agendador import AgendadorNotificacoes
 from manutencao.aapresentacao.esquemas import (
     AbrirChamadoRequisicao,
+    AtribuirTecnicosRequisicao,
     ChamadoResposta,
+    ConcluirAtendimentoRequisicao,
+    DefinirPrioridadeRequisicao,
     para_resposta,
 )
 
@@ -30,6 +33,84 @@ class ManutencaoController:
             "/chamados", self.get_chamados, methods=["GET"],
             response_model=list[ChamadoResposta],
         )
+        self.router.add_api_route(
+            "/chamados/{chamado_id}/atribuicao",
+            self.patch_atribuicao,
+            methods=["PATCH"],
+            response_model=ChamadoResposta,
+        )
+        self.router.add_api_route(
+            "/chamados/{chamado_id}/prioridade",
+            self.patch_prioridade,
+            methods=["PATCH"],
+            response_model=ChamadoResposta,
+        )
+        self.router.add_api_route(
+            "/chamados/{chamado_id}/iniciar",
+            self.patch_iniciar,
+            methods=["PATCH"],
+            response_model=ChamadoResposta,
+        )
+        self.router.add_api_route(
+            "/chamados/{chamado_id}/concluir",
+            self.patch_concluir,
+            methods=["PATCH"],
+            response_model=ChamadoResposta,
+        )
+
+    def patch_iniciar(
+        self,
+        chamado_id: int,
+        x_usuario_id: int | None = Header(default=None),
+    ) -> ChamadoResposta:
+        if x_usuario_id is None:
+            raise AcessoNegado("User header is required.")
+        return para_resposta(
+            self.servico.iniciar_atendimento(x_usuario_id, chamado_id)
+        )
+
+    def patch_concluir(
+        self,
+        chamado_id: int,
+        corpo: ConcluirAtendimentoRequisicao,
+        x_usuario_id: int | None = Header(default=None),
+    ) -> ChamadoResposta:
+        if x_usuario_id is None:
+            raise AcessoNegado("User header is required.")
+        return para_resposta(
+            self.servico.concluir_atendimento(
+                x_usuario_id,
+                chamado_id,
+                corpo.diagnostico,
+                corpo.descricao_intervencao,
+            )
+        )
+
+    def patch_atribuicao(
+        self,
+        chamado_id: int,
+        corpo: AtribuirTecnicosRequisicao,
+        x_usuario_id: int | None = Header(default=None),
+    ) -> ChamadoResposta:
+        if x_usuario_id is None:
+            raise AcessoNegado("User header is required.")
+        chamado = self.servico.atribuir_tecnicos(
+            x_usuario_id, chamado_id, corpo.tecnicos_ids
+        )
+        return para_resposta(chamado)
+
+    def patch_prioridade(
+        self,
+        chamado_id: int,
+        corpo: DefinirPrioridadeRequisicao,
+        x_usuario_id: int | None = Header(default=None),
+    ) -> ChamadoResposta:
+        if x_usuario_id is None:
+            raise AcessoNegado("User header is required.")
+        chamado = self.servico.definir_prioridade(
+            x_usuario_id, chamado_id, corpo.prioridade
+        )
+        return para_resposta(chamado)
 
     def post_chamados(
         self,
