@@ -24,6 +24,23 @@ class ChamadoResposta(BaseModel):
     descricao_problema: str
     data_ocorrencia: date
     data_abertura: datetime
+    data_inicio_atendimento: datetime | None = None
+    diagnostico: str | None = None
+    descricao_intervencao: str | None = None
+    data_conclusao: datetime | None = None
+
+
+class AtribuirTecnicosRequisicao(BaseModel):
+    tecnicos_ids: list[int] = Field(min_length=1)
+
+
+class DefinirPrioridadeRequisicao(BaseModel):
+    prioridade: Chamado.Prioridade
+
+
+class ConcluirAtendimentoRequisicao(BaseModel):
+    diagnostico: str = Field(min_length=1)
+    descricao_intervencao: str = Field(min_length=1)
 
 
 def para_resposta(chamado: Chamado) -> ChamadoResposta:
@@ -39,4 +56,8 @@ def para_resposta(chamado: Chamado) -> ChamadoResposta:
         descricao_problema=chamado.descricao_problema,
         data_ocorrencia=chamado.data_ocorrencia,
         data_abertura=chamado.data_abertura,
+        data_inicio_atendimento=chamado.data_inicio_atendimento,
+        diagnostico=chamado.diagnostico,
+        descricao_intervencao=chamado.descricao_intervencao,
+        data_conclusao=chamado.data_conclusao,
     )

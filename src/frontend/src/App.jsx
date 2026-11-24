@@ -1,8 +1,12 @@
 import { useState } from "react";
+import { Bell } from "lucide-react";
 import { USUARIOS } from "./dados/catalogo.js";
 import SeletorUsuario from "./componentes/SeletorUsuario.jsx";
 import TelaAbrirChamado from "./telas/TelaAbrirChamado.jsx";
 import TelaListaChamados from "./telas/TelaListaChamados.jsx";
+import TelaInicial from "./telas/TelaInicial.jsx";
+import TelaNotificacoes from "./telas/TelaNotificacoes.jsx";
+import TelaPrototipo from "./telas/TelaPrototipo.jsx";
 
 const CHAVE_USUARIO = "manutencao.usuarioId";
 
@@ -18,17 +22,20 @@ function usuarioSalvo() {
 }
 
 const TELAS = [
+  { id: "inicio", titulo: "Início" },
   { id: "abrir", titulo: "Abrir chamado" },
-  { id: "lista", titulo: "Chamados" },
+  { id: "equipamentos", titulo: "Equipamentos" },
+  { id: "chamados", titulo: "Consultar chamados" },
 ];
 
 export default function App() {
   const [usuarioId, setUsuarioId] = useState(usuarioSalvo);
-  const [tela, setTela] = useState("abrir");
+  const [tela, setTela] = useState("inicio");
   const usuario = USUARIOS.find((u) => u.id === usuarioId);
 
   function mudarUsuario(id) {
     setUsuarioId(id);
+    setTela("inicio");
     try {
       localStorage.setItem(CHAVE_USUARIO, String(id));
     } catch {
@@ -38,39 +45,55 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topo">
-        <div className="topo-conteudo">
-          <div className="marca">
-            <img src="/icone.svg" alt="" width="32" height="32" />
-            <div>
-              <h1>Manutenção de Laboratório</h1>
-              <span>Chamados de equipamentos · UFPR</span>
-            </div>
-          </div>
-          <SeletorUsuario usuarioId={usuarioId} onMudar={mudarUsuario} />
-        </div>
-        <nav className="abas" aria-label="Telas">
-          {TELAS.map((t) => (
+      <header className="cabecalho-sgme">
+        <div className="cabecalho-superior">
+          <button className="marca-sgme" type="button" onClick={() => setTela("inicio")}>
+            <strong>SGME</strong>
+            <span>Sistema de Gerenciamento e<br />Manutenção de Equipamentos</span>
+          </button>
+          <div className="area-usuario">
+            <span className="acesso-como">acessando como</span>
+            <SeletorUsuario usuarioId={usuarioId} onMudar={mudarUsuario} />
             <button
-              key={t.id}
+              className="botao-sino"
               type="button"
-              className={`aba ${tela === t.id ? "aba-ativa" : ""}`}
-              aria-current={tela === t.id ? "page" : undefined}
-              onClick={() => setTela(t.id)}
+              aria-label="Abrir notificações"
+              onClick={() => setTela("notificacoes")}
             >
-              {t.titulo}
+              <Bell size={27} strokeWidth={2.2} aria-hidden="true" />
+              <i aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <nav className="navegacao-sgme" aria-label="Navegação principal">
+          {TELAS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={tela === item.id ? "ativo" : ""}
+              onClick={() => setTela(item.id)}
+            >
+              {item.titulo}
             </button>
           ))}
         </nav>
       </header>
 
-      <main className="conteudo">
-        {tela === "abrir" ? (
-          <TelaAbrirChamado usuario={usuario} onVerLista={() => setTela("lista")} />
-        ) : (
-          <TelaListaChamados usuario={usuario} />
-        )}
-      </main>
+      {tela === "inicio" && (
+        <TelaInicial onAbrir={() => setTela("abrir")} />
+      )}
+      {tela === "abrir" && (
+        <TelaAbrirChamado usuario={usuario} onVerLista={() => setTela("chamados")} />
+      )}
+      {tela === "chamados" && (
+        <TelaListaChamados usuario={usuario} />
+      )}
+      {tela === "notificacoes" && (
+        <TelaNotificacoes usuario={usuario} onAbrirChamado={() => setTela("chamados")} />
+      )}
+      {tela === "equipamentos" && (
+        <TelaPrototipo titulo="Equipamentos" />
+      )}
     </div>
   );
 }
