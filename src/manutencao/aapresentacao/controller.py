@@ -17,6 +17,7 @@ from manutencao.aapresentacao.esquemas import (
     ChamadoResposta,
     ConcluirAtendimentoRequisicao,
     DefinirPrioridadeRequisicao,
+    NotificacaoResposta,
     para_resposta,
 )
 
@@ -57,6 +58,20 @@ class ManutencaoController:
             methods=["PATCH"],
             response_model=ChamadoResposta,
         )
+        self.router.add_api_route(
+            "/notificacoes",
+            self.get_notificacoes,
+            methods=["GET"],
+            response_model=list[NotificacaoResposta],
+        )
+
+    def get_notificacoes(
+        self,
+        x_usuario_id: int | None = Header(default=None),
+    ) -> list[dict]:
+        if x_usuario_id is None:
+            raise AcessoNegado("User header is required.")
+        return self.servico.listar_notificacoes(x_usuario_id)
 
     def patch_iniciar(
         self,

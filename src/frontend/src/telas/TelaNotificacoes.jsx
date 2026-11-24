@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { consultarChamados } from "../api/manutencaoApi.js";
-import { nomeUsuario } from "../dados/catalogo.js";
+import { listarNotificacoes } from "../api/manutencaoApi.js";
 import Aviso from "../componentes/Aviso.jsx";
 
 function formatarData(iso) {
@@ -12,13 +11,13 @@ function formatarHora(iso) {
 }
 
 export default function TelaNotificacoes({ usuario, onAbrirChamado }) {
-  const [chamados, setChamados] = useState([]);
+  const [notificacoes, setNotificacoes] = useState([]);
   const [erro, setErro] = useState(null);
 
   const carregar = useCallback(async () => {
     setErro(null);
     try {
-      setChamados(await consultarChamados(usuario.id));
+      setNotificacoes(await listarNotificacoes(usuario.id));
     } catch (falha) {
       setErro(falha.message);
     }
@@ -27,15 +26,6 @@ export default function TelaNotificacoes({ usuario, onAbrirChamado }) {
   useEffect(() => {
     carregar();
   }, [carregar]);
-
-  const notificacoes = [...chamados]
-    .sort((a, b) => new Date(b.data_abertura) - new Date(a.data_abertura))
-    .map((chamado) => ({
-      chamado,
-      data: chamado.data_abertura,
-      remetente: "SGME",
-      mensagem: `Chamado #${chamado.id} registrado para ${chamado.equipamento_nome}.`,
-    }));
 
   return (
     <main className="area-interna">
@@ -63,12 +53,12 @@ export default function TelaNotificacoes({ usuario, onAbrirChamado }) {
               </tr>
             </thead>
             <tbody>
-              {notificacoes.map(({ chamado, data, remetente, mensagem }) => (
-                <tr key={chamado.id}>
+              {notificacoes.map(({ id, chamado_id, data, remetente, mensagem }) => (
+                <tr key={id}>
                   <td data-rotulo="Data">{formatarData(data)}</td>
                   <td data-rotulo="Horário">{formatarHora(data)}</td>
                   <td data-rotulo="Remetente">{remetente}</td>
-                  <td data-rotulo="Mensagem">{mensagem} <small>Solicitante: {nomeUsuario(chamado.solicitante_id)}</small></td>
+                  <td data-rotulo="Mensagem">{mensagem} <small>Chamado #{chamado_id}</small></td>
                   <td data-rotulo="Ações">
                     <button type="button" className="botao-ver" onClick={onAbrirChamado}>
                       Ver chamado

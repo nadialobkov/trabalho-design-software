@@ -40,6 +40,14 @@ class ManutencaoRepositorio(ABC):
         ...
 
     @abstractmethod
+    def listar_usuarios(self) -> list[Usuario]:
+        ...
+
+    @abstractmethod
+    def salvar_notificacao(self, notificacao: Notificacao) -> None:
+        ...
+
+    @abstractmethod
     def buscar_departamento(self, departamento_id: int) -> Departamento | None:
         ...
 

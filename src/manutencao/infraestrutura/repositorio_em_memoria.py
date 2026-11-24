@@ -96,6 +96,15 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
     def buscar_usuario(self, usuario_id: int) -> Usuario | None:
         return self._usuarios.get(usuario_id)
 
+    def listar_usuarios(self) -> list[Usuario]:
+        return [self._usuarios[id] for id in sorted(self._usuarios)]
+
+    def salvar_notificacao(self, notificacao: Notificacao) -> None:
+        if notificacao.id is None:
+            notificacao.id = self._proxima_notificacao_id
+            self._proxima_notificacao_id += 1
+        self._notificacoes[notificacao.id] = notificacao
+
     def buscar_departamento(self, departamento_id: int) -> Departamento | None:
         return self._departamentos.get(departamento_id)
 
