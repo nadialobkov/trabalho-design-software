@@ -1,10 +1,13 @@
 # Inicia todos os serviços com docker compose up --build
 #   web      → telas React (nginx)       http://localhost:8080
 #   app      → backend monolítico        http://localhost:7555/docs
-#   db       → PostgreSQL                localhost:5433 (5432 dentro do Docker)
+#   db       → PostgreSQL                localhost:5078 (5432 dentro do Docker)
 #   mailpit  → caixa de e-mail de teste  http://localhost:8025
 # As portas escutam em 127.0.0.1 e só aceitam conexões deste computador.
 # As senhas abaixo servem apenas para desenvolvimento local.
+
+# Mantém o mesmo nome de projeto usado quando este arquivo ficava na raiz do repositório.
+name: trabalho-design-software
 
 services:
   db:
@@ -14,7 +17,7 @@ services:
       POSTGRES_PASSWORD: manutencao
       POSTGRES_DB: manutencao
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5078:5432"
     volumes:
       - dados-postgres:/var/lib/postgresql
       # Executa os scripts em ordem de nome na primeira inicialização do banco.

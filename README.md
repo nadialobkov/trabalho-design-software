@@ -42,7 +42,7 @@ O comando sobe quatro serviços ao mesmo tempo:
 |---|---|---|
 | `web` | As telas React (servidas pelo nginx) | `http://localhost:8080` |
 | `app` | O backend (o monólito) | `http://localhost:7555/docs` |
-| `db` | PostgreSQL 18, já com as tabelas e os dados de exemplo | `localhost:5433` |
+| `db` | PostgreSQL 18, já com as tabelas e os dados de exemplo | `localhost:5078` |
 | `mailpit` | Caixa de e-mail falsa | `http://localhost:8025` |
 
 O banco é criado na primeira vez, a partir de `banco/schema.sql` e `banco/dados_exemplo.sql`. Os dados continuam salvos entre uma execução e outra.
@@ -136,7 +136,7 @@ As telas ainda não têm como buscar usuários e equipamentos na API, então usa
 cd src
 uv run pytest                                  # testes sem banco
 docker compose up -d db                        # para os testes do PostgreSQL:
-TEST_DATABASE_URL=postgresql://manutencao:manutencao@localhost:5433/manutencao_teste uv run pytest
+TEST_DATABASE_URL=postgresql://manutencao:manutencao@localhost:5078/manutencao_teste uv run pytest
 ```
 
 Os testes do PostgreSQL apagam e recriam o banco `manutencao_teste`. Nunca use o banco `manutencao` neles.
