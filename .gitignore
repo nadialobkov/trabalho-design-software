@@ -3,6 +3,6 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 .env
-
+slides.md
 # Plano local de testes manuais, fora da entrega.
 test-trabalho.md
