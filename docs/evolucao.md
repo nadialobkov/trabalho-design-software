@@ -6,12 +6,13 @@
 
 Na arquitetura escolhida — monólito, cliente-servidor e quatro camadas — o impacto depende da responsabilidade afetada. Uma mudança de persistência se concentra na infraestrutura e na configuração, enquanto uma nova interface cliente se concentra na apresentação e na comunicação com a API. Essa separação reduz o alcance das mudanças, mas não elimina a necessidade de adaptar contratos, migrar dados e verificar o comportamento.
 
-Foram selecionadas duas evoluções relacionadas à implementação existente:
+Foram selecionadas três evoluções relacionadas à implementação existente:
 
 1. **Substituir PostgreSQL por outro banco relacional**, como MySQL, preservando os casos de uso.
 2. **Incluir um aplicativo mobile**, mantendo o cliente web e reutilizando o backend.
+3. **Substituir o e-mail por WhatsApp** no envio das notificações.
 
-A primeira representa uma substituição de tecnologia; a segunda, uma ampliação das formas de acesso. A análise considera a abertura e consulta de chamados, os filtros e o processamento de notificações já disponíveis. Funcionalidades planejadas não passam a existir automaticamente com essas mudanças.
+A primeira representa uma substituição de tecnologia; a segunda, uma ampliação das formas de acesso; a terceira, a troca de uma integração externa. A análise considera a abertura e consulta de chamados, os filtros e o processamento de notificações já disponíveis. Funcionalidades planejadas não passam a existir automaticamente com essas mudanças.
 
 ## 2. Mudança A — PostgreSQL para outro banco relacional
 
@@ -127,11 +128,67 @@ Falhas de rede também exigem cuidado. Se o aplicativo repetir uma abertura porq
 - **ASR03:** abrir um chamado pelo aplicativo também preserva sua notificação quando o SMTP está indisponível.
 - **Compatibilidade:** ambos os clientes conseguem utilizar os contratos existentes; evoluções da API não quebram a interface web sem planejamento.
 
-## 4. Síntese dos impactos
+## 4. Mudança C — E-mail para WhatsApp
+
+### 4.1. Cenário e alcance
+
+A universidade poderia preferir avisar solicitantes e técnicos pelo WhatsApp, por ser um canal mais consultado no dia a dia do que o e-mail. A mudança substitui o envio por SMTP pelo envio por meio de uma API de mensagens do WhatsApp, mantendo a confirmação de abertura do chamado (RF08) e a confiabilidade das notificações (ASR03).
+
+O serviço de aplicação depende apenas da interface `Notificador`, cuja operação `enviar(notificacao)` lança `OSError` quando o envio falha. `SmtpNotificador` é a implementação atual, selecionada em `main.py`. A troca do canal, portanto, se concentra principalmente em uma nova implementação dessa interface.
+
+### 4.2. Elementos afetados
+
+| Elemento | Alteração necessária |
+|---|---|
+| Nova implementação de `Notificador` | Criar `WhatsAppNotificador`, que envia a mensagem pela API do provedor e converte as falhas de comunicação em `OSError`, como exige o contrato |
+| `main.py` e configuração | Instanciar `WhatsAppNotificador` no lugar de `SmtpNotificador` e fornecer endereço da API, credenciais e número remetente pelo `.env` |
+| Destinatário | Hoje `abrir_chamado()` usa `usuario.email` como destinatário. Seria necessário guardar o telefone do usuário: novo atributo em `Usuario`, nova coluna na tabela `usuario`, ajustes nos repositórios e nos dados de exemplo |
+| Conteúdo da mensagem | `_preencher_confirmacao()` monta um texto no formato de e-mail, com assunto. O WhatsApp não possui assunto, e o provedor pode exigir modelos de mensagem pré-aprovados para mensagens iniciadas pela empresa |
+| Dependências | Acrescentar uma biblioteca cliente HTTP ou o SDK do provedor e atualizar o arquivo de dependências e seu lock |
+| Ambiente de demonstração | O Mailpit deixa de ser útil. É preciso uma conta de teste do provedor ou o uso de `NotificadorFake` na demonstração |
+| Testes e documentação | Testar o novo notificador simulando respostas de sucesso e de erro da API e atualizar as instruções de configuração |
+
+O campo `destinatario` da tabela `notificacao` é um texto e pode guardar um número de telefone sem alteração no esquema dessa tabela.
+
+### 4.3. Elementos que podem permanecer inalterados
+
+- **Domínio do atendimento:** `Chamado`, `Equipamento`, `Departamento` e `RegistroAuditoria` não conhecem o canal de envio.
+- **Entidade `Notificacao`:** os estados `PENDENTE`, `ENVIADA` e `FALHOU` e o limite `MAX_TENTATIVAS` continuam válidos para qualquer canal.
+- **Casos de uso:** `reenviar_notificacoes()` continua chamando `notificador.enviar()` e registrando sucesso ou falha da mesma forma.
+- **Transação de abertura:** o chamado, a auditoria e a notificação pendente continuam sendo salvos juntos; o envio continua fora dessa transação.
+- **Agendador:** `AgendadorNotificacoes` continua acionando o processamento a cada dez segundos.
+- **Controller, esquemas HTTP e telas React:** a API e as telas não dependem do canal de notificação.
+- **Persistência dos chamados:** as tabelas de chamados, auditoria e notificações e as consultas existentes permanecem iguais.
+
+### 4.4. Decisões que ajudam a mudança
+
+A **inversão de dependências** faz `ManutencaoService` conhecer apenas a interface `Notificador`, e não o SMTP. O **polimorfismo** permite que `WhatsAppNotificador` substitua `SmtpNotificador` sem alterar quem o utiliza. A **injeção pelo construtor** concentra essa escolha em `main.py`.
+
+O **envio assíncrono com fila no banco** (ASR03) também ajuda: se a API do WhatsApp estiver indisponível, o chamado continua sendo registrado, e a notificação permanece pendente até um novo envio, exatamente como ocorre hoje com o SMTP.
+
+### 4.5. Decisões que dificultam ou exigem atenção
+
+O modelo de notificação foi pensado para e-mail. O destinatário vem do e-mail do usuário e a mensagem possui assunto. Além disso, `reenviar_notificacoes()` usa o assunto vazio como sinal de que o texto ainda não foi montado. Se o assunto deixar de ser usado, essa verificação também precisa mudar.
+
+O contrato de `Notificador` só trata `OSError` como falha. Uma biblioteca HTTP que lance outros tipos de erro precisa ter esses erros convertidos dentro de `WhatsAppNotificador`. Caso contrário, a implementação não seria uma substituição equivalente (LSP), e uma falha poderia interromper o processamento das demais notificações.
+
+A política atual trata todas as falhas da mesma forma: até cinco tentativas. Com o WhatsApp, existem falhas permanentes, como número inválido, que não melhoram com novas tentativas, e limites de envio impostos pelo provedor. Diferenciar esses casos exigiria ampliar o contrato ou a entidade `Notificacao`.
+
+Se a universidade quiser **manter os dois canais** ao mesmo tempo, a mudança é maior: `Notificacao` precisaria registrar o canal, o usuário precisaria indicar sua preferência e seria necessário um notificador que escolha a implementação adequada para cada mensagem.
+
+### 4.6. Garantias a verificar
+
+- **ASR01:** a troca do canal não altera a auditoria das operações do chamado.
+- **ASR02:** a troca do canal não altera as verificações de permissão, que continuam no serviço de aplicação.
+- **ASR03:** com a API do WhatsApp indisponível, o chamado é registrado, a notificação fica `PENDENTE` e é reenviada depois; após `MAX_TENTATIVAS` falhas, passa para `FALHOU`.
+- **Compatibilidade:** notificações pendentes criadas antes da troca, com endereços de e-mail como destinatário, precisam ser enviadas, convertidas ou encerradas de forma planejada.
+
+## 5. Síntese dos impactos
 
 | Mudança | Principal área afetada | Principal área preservada | Limite da reutilização |
 |---|---|---|---|
 | PostgreSQL para outro banco relacional | Infraestrutura, esquema, dados, configuração e testes de integração | Domínio, casos de uso e clientes, se os contratos forem mantidos | A nova persistência precisa reproduzir transações, auditoria e coordenação das pendências |
 | Inclusão de aplicativo mobile | Apresentação, cliente HTTP, conectividade e identificação; API quando necessário | Casos de uso existentes, domínio, persistência e envio de e-mails | A API cobre apenas as funções disponíveis e a identidade simulada precisa ser revista para uso real |
+| E-mail para WhatsApp | Nova implementação de `Notificador`, configuração, telefone do usuário e formato da mensagem | Domínio do atendimento, `Notificacao`, casos de uso, agendador, API e telas | O modelo de notificação foi pensado para e-mail; manter os dois canais exigiria ampliá-lo |
 
 A organização em camadas e o uso de contratos reduzem a propagação das mudanças, mas não tornam qualquer substituição automática. A evolução deve preservar o significado das operações e suas garantias de rastreabilidade, autorização e recuperação, além de adaptar os detalhes técnicos específicos da tecnologia ou do cliente introduzido.
