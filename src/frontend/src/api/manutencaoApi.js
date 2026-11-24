@@ -95,3 +95,7 @@ export function concluirAtendimento(usuarioId, chamadoId, diagnostico, descricao
     }),
   });
 }
+
+export function listarNotificacoes(usuarioId) {
+  return requisitar("/notificacoes", usuarioId);
+}

@@ -167,6 +167,37 @@ class PostgresManutencaoRepositorio(ManutencaoRepositorio):
         with self._conectar() as conn, conn.cursor() as cur:
             return self._carregar_usuario(cur, usuario_id)
 
+    def listar_usuarios(self) -> list[Usuario]:
+        with self._conectar() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM usuario ORDER BY id")
+            return [
+                Usuario(
+                    linha["id"],
+                    linha["nome"],
+                    linha["email"],
+                    Usuario.Papel(linha["papel"]),
+                    self._carregar_departamento(cur, linha["departamento_id"]),
+                )
+                for linha in cur.fetchall()
+            ]
+
+    def salvar_notificacao(self, notificacao: Notificacao) -> None:
+        with self._conectar() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO notificacao"
+                " (chamado_id, destinatario, assunto, mensagem, status, tentativas)"
+                " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                (
+                    notificacao.chamado.id,
+                    notificacao.destinatario,
+                    notificacao.assunto,
+                    notificacao.mensagem,
+                    str(notificacao.status),
+                    notificacao.tentativas,
+                ),
+            )
+            notificacao.id = cur.fetchone()["id"]
+
     def buscar_departamento(self, departamento_id: int) -> Departamento | None:
         with self._conectar() as conn, conn.cursor() as cur:
             return self._carregar_departamento(cur, departamento_id)

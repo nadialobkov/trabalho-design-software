@@ -43,6 +43,14 @@ class ConcluirAtendimentoRequisicao(BaseModel):
     descricao_intervencao: str = Field(min_length=1)
 
 
+class NotificacaoResposta(BaseModel):
+    id: int
+    chamado_id: int
+    data: datetime
+    remetente: str
+    mensagem: str
+
+
 def para_resposta(chamado: Chamado) -> ChamadoResposta:
     return ChamadoResposta(
         id=chamado.id,

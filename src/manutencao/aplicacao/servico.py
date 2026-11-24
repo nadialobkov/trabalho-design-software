@@ -54,6 +54,14 @@ class ManutencaoService:
         # Preenche o texto após a gravação, quando o chamado já tem ID.
         self._preencher_confirmacao(notificacao)
         self.repo.atualizar_notificacao(notificacao)
+        for coordenador in self._coordenadores_departamento(chamado.departamento.id):
+            self._salvar_email(
+                chamado,
+                coordenador.email,
+                f"Chamado #{chamado.id} aberto",
+                f"O chamado #{chamado.id} foi aberto para {chamado.equipamento.nome}. "
+                "Atribua um técnico responsável.",
+            )
         return chamado
 
     def consultar_chamados(
@@ -130,6 +138,21 @@ class ManutencaoService:
             valor_novo=novos,
         )
         self.repo.salvar_chamado(chamado, auditoria)
+        for tecnico in tecnicos:
+            self._salvar_email(
+                chamado,
+                tecnico.email,
+                f"Novo chamado #{chamado.id} atribuído",
+                f"Você recebeu o chamado #{chamado.id} para {chamado.equipamento.nome}.",
+            )
+        nomes = ", ".join(tecnico.nome for tecnico in tecnicos)
+        for coordenador in self._coordenadores_departamento(chamado.departamento.id):
+            self._salvar_email(
+                chamado,
+                coordenador.email,
+                f"Chamado #{chamado.id} atribuído",
+                f"O chamado #{chamado.id} foi atribuído ao técnico {nomes} com sucesso.",
+            )
         return chamado
 
     def definir_prioridade(
@@ -161,6 +184,14 @@ class ManutencaoService:
             valor_novo=str(prioridade),
         )
         self.repo.salvar_chamado(chamado, auditoria)
+        self._notificar_estado(
+            chamado,
+            tecnico,
+            assunto="Chamado em andamento",
+            mensagem_solicitante=f"Seu chamado #{chamado.id} está em andamento.",
+            mensagem_tecnico=f"Chamado #{chamado.id} está em andamento agora.",
+            mensagem_coordenador=f"O técnico {tecnico.nome} está resolvendo o chamado #{chamado.id}.",
+        )
         return chamado
 
     def iniciar_atendimento(self, usuario_id: int, chamado_id: int) -> Chamado:
@@ -185,6 +216,19 @@ class ManutencaoService:
             valor_novo="EM_ATENDIMENTO",
         )
         self.repo.salvar_chamado(chamado, auditoria)
+        self._notificar_estado(
+            chamado,
+            tecnico,
+            assunto="Chamado concluído",
+            mensagem_solicitante=(
+                f"Seu chamado #{chamado.id} foi concluído. "
+                f"Intervenção: {chamado.descricao_intervencao}"
+            ),
+            mensagem_tecnico=f"Chamado #{chamado.id} concluído com sucesso.",
+            mensagem_coordenador=(
+                f"O técnico {tecnico.nome} concluiu o chamado #{chamado.id} com sucesso."
+            ),
+        )
         return chamado
 
     def concluir_atendimento(
@@ -222,6 +266,138 @@ class ManutencaoService:
         )
         self.repo.salvar_chamado(chamado, auditoria)
         return chamado
+
+    def listar_notificacoes(self, usuario_id: int) -> list[dict]:
+        usuario = self._verificar_permissao(usuario_id, "consultar")
+        chamadas = self.consultar_chamados(usuario_id, FiltrosChamado())
+        eventos: list[dict] = []
+
+        for chamado in chamadas:
+            for auditoria in self.repo.listar_auditoria(chamado.id):
+                mensagem = None
+                remetente = "SGME"
+
+                if auditoria.campo == "estado" and auditoria.valor_novo == "ABERTO":
+                    if usuario.papel == Usuario.Papel.SOLICITANTE:
+                        mensagem = f"Chamado #{chamado.id} registrado com sucesso."
+                        remetente = "SGME"
+                    elif usuario.papel == Usuario.Papel.COORDENADOR:
+                        mensagem = f"Chamado #{chamado.id} aberto. Atribua um técnico."
+                        remetente = chamado.solicitante.nome
+                elif auditoria.campo == "tecnicos":
+                    tecnicos_ids = {
+                        int(valor)
+                        for valor in (auditoria.valor_novo or "").split(",")
+                        if valor
+                    }
+                    if usuario.papel == Usuario.Papel.TECNICO and usuario.id in tecnicos_ids:
+                        mensagem = f"Novo chamado #{chamado.id} atribuído a você."
+                        remetente = auditoria.autor.nome
+                    elif usuario.papel == Usuario.Papel.COORDENADOR:
+                        nomes = [
+                            tecnico.nome
+                            for tecnico in chamado.tecnicos
+                            if tecnico.id in tecnicos_ids
+                        ]
+                        mensagem = (
+                            f"Chamado #{chamado.id} atribuído ao técnico "
+                            f"{', '.join(nomes) if nomes else 'responsável'} com sucesso."
+                        )
+                        remetente = auditoria.autor.nome
+                elif (
+                    auditoria.campo == "estado"
+                    and auditoria.valor_novo == "EM_ATENDIMENTO"
+                ):
+                    if usuario.papel == Usuario.Papel.SOLICITANTE:
+                        mensagem = f"Seu chamado #{chamado.id} está em andamento."
+                        remetente = auditoria.autor.nome
+                    elif usuario.papel == Usuario.Papel.TECNICO:
+                        if any(tecnico.id == usuario.id for tecnico in chamado.tecnicos):
+                            mensagem = f"Chamado #{chamado.id} está em andamento agora."
+                            remetente = usuario.nome
+                    elif usuario.papel == Usuario.Papel.COORDENADOR:
+                        mensagem = (
+                            f"O técnico {auditoria.autor.nome} está resolvendo "
+                            f"o chamado #{chamado.id}."
+                        )
+                        remetente = auditoria.autor.nome
+                elif (
+                    auditoria.campo == "estado"
+                    and auditoria.valor_novo == "CONCLUIDO"
+                ):
+                    if usuario.papel == Usuario.Papel.SOLICITANTE:
+                        mensagem = (
+                            f"Seu chamado #{chamado.id} foi concluído. "
+                            f"Intervenção: {chamado.descricao_intervencao or '-'}"
+                        )
+                        remetente = auditoria.autor.nome
+                    elif usuario.papel == Usuario.Papel.TECNICO:
+                        if any(tecnico.id == usuario.id for tecnico in chamado.tecnicos):
+                            mensagem = f"Chamado #{chamado.id} concluído com sucesso."
+                            remetente = usuario.nome
+                    elif usuario.papel == Usuario.Papel.COORDENADOR:
+                        mensagem = (
+                            f"O técnico {auditoria.autor.nome} concluiu o chamado "
+                            f"#{chamado.id} com sucesso."
+                        )
+                        remetente = auditoria.autor.nome
+
+                if mensagem:
+                    eventos.append({
+                        "id": auditoria.id or 0,
+                        "chamado_id": chamado.id,
+                        "data": auditoria.data_hora.isoformat(),
+                        "remetente": remetente,
+                        "mensagem": mensagem,
+                    })
+
+        eventos.sort(key=lambda evento: evento["data"], reverse=True)
+        return eventos
+
+    def _coordenadores_departamento(self, departamento_id: int) -> list[Usuario]:
+        return [
+            usuario
+            for usuario in self.repo.listar_usuarios()
+            if usuario.papel == Usuario.Papel.COORDENADOR
+            and usuario.departamento is not None
+            and usuario.departamento.id == departamento_id
+        ]
+
+    def _salvar_email(
+        self,
+        chamado: Chamado,
+        destinatario: str,
+        assunto: str,
+        mensagem: str,
+    ) -> None:
+        self.repo.salvar_notificacao(
+            Notificacao(
+                chamado=chamado,
+                destinatario=destinatario,
+                assunto=assunto,
+                mensagem=mensagem,
+            )
+        )
+
+    def _notificar_estado(
+        self,
+        chamado: Chamado,
+        tecnico: Usuario,
+        assunto: str,
+        mensagem_solicitante: str,
+        mensagem_tecnico: str,
+        mensagem_coordenador: str,
+    ) -> None:
+        self._salvar_email(
+            chamado, chamado.solicitante.email, assunto, mensagem_solicitante
+        )
+        self._salvar_email(
+            chamado, tecnico.email, assunto, mensagem_tecnico
+        )
+        for coordenador in self._coordenadores_departamento(chamado.departamento.id):
+            self._salvar_email(
+                chamado, coordenador.email, assunto, mensagem_coordenador
+            )
 
     @staticmethod
     def _tecnico_responsavel(tecnico: Usuario, chamado: Chamado) -> bool:
@@ -280,12 +456,12 @@ class ManutencaoService:
         """
         chamado = notificacao.chamado
         equipamento = chamado.equipamento
-        notificacao.assunto = f"Chamado #{chamado.id} registrado"
+        notificacao.assunto = f"Chamado #{chamado.id} registrado com sucesso"
         # O e-mail inclui os dados registrados para o solicitante ter uma cópia (RF08).
         notificacao.mensagem = (
             f"Olá, {chamado.solicitante.nome}.\n"
             "\n"
-            f"Seu chamado #{chamado.id} foi registrado.\n"
+            f"Seu chamado #{chamado.id} foi registrado com sucesso.\n"
             "\n"
             f"Equipamento: {equipamento.nome} ({equipamento.laboratorio})\n"
             f"Problema: {chamado.descricao_problema}\n"
