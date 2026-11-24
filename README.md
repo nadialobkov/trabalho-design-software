@@ -32,6 +32,7 @@ Não é preciso instalar PostgreSQL nem Mailpit: eles rodam em contêineres.
 ### Rodar
 
 ```bash
+cd src
 docker compose up --build
 ```
 
@@ -59,8 +60,30 @@ Abra `http://localhost:8080`. Não há login: escolha o usuário no campo **Aces
 | 3 | Carla | Coordenadora | Elétrica |
 | 4 | Davi | Técnico | Óptica |
 | 5 | Eva | Solicitante | — |
+| 6 | Fábio | Técnico | Elétrica |
+| 7 | Helena | Coordenadora | Óptica |
+| 8 | Igor | Técnico | Informática |
+| 9 | Juliana | Coordenadora | Informática |
+| 10 | Lucas | Técnico | Mecânica |
+| 11 | Marina | Coordenadora | Mecânica |
+| 12 | Paulo | Solicitante | — |
 
-Equipamentos: 10 Osciloscópio e 11 Fonte de bancada (Elétrica), 12 Microscópio (Óptica).
+Equipamentos disponíveis:
+
+| ID | Equipamento | Departamento |
+|---|---|---|
+| 10 | Osciloscópio | Elétrica |
+| 11 | Fonte de bancada | Elétrica |
+| 12 | Microscópio | Óptica |
+| 13 | Projetor | Informática |
+| 14 | Computador Lenovo | Informática |
+| 15 | Servidor Dell | Informática |
+| 16 | Centrífuga | Mecânica |
+| 17 | Balança analítica | Mecânica |
+| 18 | Espectrofotômetro | Óptica |
+| 19 | Impressora 3D | Mecânica |
+| 20 | Bancada elétrica | Elétrica |
+| 21 | Gerador de sinais | Elétrica |
 
 Exemplo de corpo para `POST /chamados`:
 
@@ -77,6 +100,7 @@ Para ver o erro de equipamento inexistente (RN01), escolha **Informar outro cód
 Útil durante o desenvolvimento, porque o servidor reinicia sozinho a cada mudança no código. O banco e o Mailpit continuam no Docker:
 
 ```bash
+cd src
 uv sync                                       # primeira vez: cria a pasta .venv
 cp .env.example .env                          # primeira vez: configurações locais (não vão para o git)
 docker compose up -d db mailpit               # só o banco e o Mailpit
@@ -97,7 +121,7 @@ Para usar um provedor real, como o Gmail, preencha também `SMTP_USUARIO` e `SMT
 Com a API rodando na porta 7555 (no Docker ou com `uv run`):
 
 ```bash
-cd frontend
+cd src/frontend
 npm install          # primeira vez
 npm run dev          # telas em http://localhost:5173, recarregam a cada mudança
 ```
@@ -109,6 +133,7 @@ As telas ainda não têm como buscar usuários e equipamentos na API, então usa
 ### Testes
 
 ```bash
+cd src
 uv run pytest                                  # testes sem banco
 docker compose up -d db                        # para os testes do PostgreSQL:
 TEST_DATABASE_URL=postgresql://manutencao:manutencao@localhost:5433/manutencao_teste uv run pytest

@@ -19,9 +19,13 @@ const MENSAGENS = {
 
 async function requisitar(caminho, usuarioId, opcoes = {}) {
   let resposta;
+  const controlador = new AbortController();
+  const limite = setTimeout(() => controlador.abort(), 10000);
   try {
     resposta = await fetch(`${BASE}${caminho}`, {
       ...opcoes,
+      credentials: "same-origin",
+      signal: controlador.signal,
       headers: {
         "Content-Type": "application/json",
         "X-Usuario-Id": String(usuarioId),
@@ -30,6 +34,8 @@ async function requisitar(caminho, usuarioId, opcoes = {}) {
     });
   } catch {
     throw new ErroApi("Não foi possível falar com o servidor. Ele está rodando?", 0);
+  } finally {
+    clearTimeout(limite);
   }
 
   if (!resposta.ok) {
@@ -58,4 +64,34 @@ export function consultarChamados(usuarioId, filtros = {}) {
   }
   const consulta = parametros.toString();
   return requisitar(`/chamados${consulta ? `?${consulta}` : ""}`, usuarioId);
+}
+
+export function atribuirTecnicos(usuarioId, chamadoId, tecnicosIds) {
+  return requisitar(`/chamados/${chamadoId}/atribuicao`, usuarioId, {
+    method: "PATCH",
+    body: JSON.stringify({ tecnicos_ids: tecnicosIds }),
+  });
+}
+
+export function definirPrioridade(usuarioId, chamadoId, prioridade) {
+  return requisitar(`/chamados/${chamadoId}/prioridade`, usuarioId, {
+    method: "PATCH",
+    body: JSON.stringify({ prioridade }),
+  });
+}
+
+export function iniciarAtendimento(usuarioId, chamadoId) {
+  return requisitar(`/chamados/${chamadoId}/iniciar`, usuarioId, {
+    method: "PATCH",
+  });
+}
+
+export function concluirAtendimento(usuarioId, chamadoId, diagnostico, descricaoIntervencao) {
+  return requisitar(`/chamados/${chamadoId}/concluir`, usuarioId, {
+    method: "PATCH",
+    body: JSON.stringify({
+      diagnostico,
+      descricao_intervencao: descricaoIntervencao,
+    }),
+  });
 }

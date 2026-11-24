@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from manutencao.aplicacao.filtros import FiltrosChamado
 from manutencao.aplicacao.interface_repositorio import ManutencaoRepositorio
 from manutencao.dominio.chamado import Chamado
@@ -129,7 +131,9 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
         repo = cls()
         eletrica = Departamento(1, "Elétrica")
         optica = Departamento(2, "Óptica")
-        for departamento in (eletrica, optica):
+        informatica = Departamento(3, "Informática")
+        mecanica = Departamento(4, "Mecânica")
+        for departamento in (eletrica, optica, informatica, mecanica):
             repo.adicionar_departamento(departamento)
 
         for usuario in (
@@ -138,6 +142,13 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
             Usuario(3, "Carla", "carla@example.com", Usuario.Papel.COORDENADOR, eletrica),
             Usuario(4, "Davi", "davi@example.com", Usuario.Papel.TECNICO, optica),
             Usuario(5, "Eva", "eva@example.com", Usuario.Papel.SOLICITANTE),
+            Usuario(6, "Fábio", "fabio@example.com", Usuario.Papel.TECNICO, eletrica),
+            Usuario(7, "Helena", "helena@example.com", Usuario.Papel.COORDENADOR, optica),
+            Usuario(8, "Igor", "igor@example.com", Usuario.Papel.TECNICO, informatica),
+            Usuario(9, "Juliana", "juliana@example.com", Usuario.Papel.COORDENADOR, informatica),
+            Usuario(10, "Lucas", "lucas@example.com", Usuario.Papel.TECNICO, mecanica),
+            Usuario(11, "Marina", "marina@example.com", Usuario.Papel.COORDENADOR, mecanica),
+            Usuario(12, "Paulo", "paulo@example.com", Usuario.Papel.SOLICITANTE),
         ):
             repo.adicionar_usuario(usuario)
 
@@ -145,6 +156,56 @@ class RepositorioEmMemoria(ManutencaoRepositorio):
             Equipamento(10, "Osciloscópio", "Laboratório de Física", eletrica),
             Equipamento(11, "Fonte de bancada", "Laboratório de Física", eletrica),
             Equipamento(12, "Microscópio", "Laboratório de Biologia", optica),
+            Equipamento(13, "Projetor", "Sala Multimídia", informatica),
+            Equipamento(14, "Computador Lenovo", "Laboratório de Redes", informatica),
+            Equipamento(15, "Servidor Dell", "Centro de Dados", informatica),
+            Equipamento(16, "Centrífuga", "Laboratório de Química", mecanica),
+            Equipamento(17, "Balança analítica", "Laboratório de Química", mecanica),
+            Equipamento(18, "Espectrofotômetro", "Laboratório de Química", optica),
+            Equipamento(19, "Impressora 3D", "Laboratório Maker", mecanica),
+            Equipamento(20, "Bancada elétrica", "Laboratório de Eletrônica", eletrica),
+            Equipamento(21, "Gerador de sinais", "Laboratório de Telecomunicações", eletrica),
         ):
             repo.adicionar_equipamento(equipamento)
+
+        exemplos = (
+            (10, 1, "Osciloscópio apresenta ruído na tela", date(2026, 11, 20),
+             Chamado.Prioridade.ALTA, Chamado.Estado.ATRIBUIDO, (2,)),
+            (13, 5, "Projetor não liga durante a aula", date(2026, 11, 21),
+             Chamado.Prioridade.MEDIA, Chamado.Estado.ABERTO,()),
+            (12, 1, "A lente não fica estabilizada", date(2026, 11, 18),
+             Chamado.Prioridade.URGENTE, Chamado.Estado.EM_ATENDIMENTO, (4,)),
+            (14, 12, "Computador reinicia sozinho", date(2026, 11, 17),
+             Chamado.Prioridade.BAIXA, Chamado.Estado.CONCLUIDO, (8,)),
+            (16, 5, "Centrífuga vibra excessivamente", date(2026, 11, 16),
+             Chamado.Prioridade.ALTA, Chamado.Estado.ABERTO,()),
+            (20, 12, "Bancada apresenta queda de tensão", date(2026, 11, 15),
+             Chamado.Prioridade.URGENTE, Chamado.Estado.ATRIBUIDO, (6,)),
+        )
+        for numero, (equipamento_id, solicitante_id, descricao, ocorrencia,
+                     prioridade, estado, tecnicos_ids) in enumerate(exemplos, start=1):
+            equipamento = repo.buscar_equipamento(equipamento_id)
+            solicitante = repo.buscar_usuario(solicitante_id)
+            chamado = Chamado.abrir(
+                equipamento,
+                solicitante,
+                descricao,
+                ocorrencia,
+                "Chamado fictício para demonstração.",
+                datetime(2026, 11, 22, 9, numero * 10),
+            )
+            chamado.prioridade = prioridade
+            chamado.estado = estado
+            chamado.tecnicos = [
+                repo.buscar_usuario(tecnico_id) for tecnico_id in tecnicos_ids
+            ]
+            auditoria = RegistroAuditoria(
+                chamado,
+                solicitante,
+                chamado.data_abertura,
+                "estado",
+                None,
+                str(chamado.estado),
+            )
+            repo.salvar_chamado(chamado, auditoria)
         return repo

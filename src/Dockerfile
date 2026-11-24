@@ -11,7 +11,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
-COPY src ./src
+COPY manutencao ./src/manutencao
 RUN uv sync --locked --no-dev
 
 EXPOSE 7555

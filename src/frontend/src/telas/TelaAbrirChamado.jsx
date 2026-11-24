@@ -56,42 +56,45 @@ export default function TelaAbrirChamado({ usuario, onVerLista }) {
 
   if (criado) {
     return (
-      <section className="cartao cartao-sucesso">
-        <div className="sucesso-icone" aria-hidden="true">✓</div>
-        <h2>Chamado #{criado.id} registrado</h2>
-        <p>
-          <strong>{criado.equipamento_nome}</strong> — {criado.descricao_problema}
-        </p>
-        <p className="texto-suave">
-          O chamado está <strong>Aberto</strong> e foi enviado ao departamento de{" "}
-          {nomeDepartamento(criado.departamento_id)}. Um e-mail de confirmação será
-          enviado em alguns segundos (RF08).
-        </p>
-        <div className="acoes">
-          <button type="button" className="botao botao-secundario" onClick={() => setCriado(null)}>
-            Abrir outro chamado
-          </button>
-          <button type="button" className="botao" onClick={onVerLista}>
-            Ver chamados
-          </button>
-        </div>
-      </section>
+      <main className="area-interna">
+        <section className="painel cartao-sucesso">
+          <div className="sucesso-icone" aria-hidden="true">✓</div>
+          <h2>Chamado #{criado.id} registrado</h2>
+          <p>
+            <strong>{criado.equipamento_nome}</strong> — {criado.descricao_problema}
+          </p>
+          <p className="texto-suave">
+            O chamado está <strong>Aberto</strong> e foi enviado ao departamento de{" "}
+            {nomeDepartamento(criado.departamento_id)}. Um e-mail de confirmação será
+            enviado em alguns segundos (RF08).
+          </p>
+          <div className="acoes">
+            <button type="button" className="botao botao-secundario" onClick={() => setCriado(null)}>
+              Abrir outro chamado
+            </button>
+            <button type="button" className="botao" onClick={onVerLista}>
+              Ver chamados
+            </button>
+          </div>
+        </section>
+      </main>
     );
   }
 
   return (
-    <section className="cartao">
-      <header className="cartao-cabecalho">
-        <h2>Abrir chamado de manutenção</h2>
-        <p className="texto-suave">
-          Informe o equipamento com problema. O chamado vai para o departamento responsável
-          por ele.
-        </p>
-      </header>
+    <main className="area-interna">
+      <section className="painel">
+        <header className="cartao-cabecalho">
+          <h2>Abrir chamado</h2>
+          <p className="texto-suave">
+            Informe o equipamento com problema. O chamado vai para o departamento responsável
+            por ele.
+          </p>
+        </header>
 
-      {erro && <Aviso titulo="Não foi possível abrir o chamado">{erro}</Aviso>}
+        {erro && <Aviso titulo="Não foi possível abrir o chamado">{erro}</Aviso>}
 
-      <form onSubmit={enviar} className="formulario">
+        <form onSubmit={enviar} className="formulario">
         <div className="campo">
           <label htmlFor="equipamento">Equipamento *</label>
           <select id="equipamento" required value={form.equipamento} onChange={mudar("equipamento")}>
@@ -168,15 +171,16 @@ export default function TelaAbrirChamado({ usuario, onVerLista }) {
           />
         </div>
 
-        <div className="acoes">
-          <span className="texto-suave">
-            Solicitante: <strong>{usuario.nome}</strong>
-          </span>
-          <button type="submit" className="botao" disabled={enviando}>
-            {enviando ? "Enviando…" : "Abrir chamado"}
-          </button>
-        </div>
-      </form>
-    </section>
+          <div className="acoes">
+            <span className="texto-suave">
+              Solicitante: <strong>{usuario.nome}</strong>
+            </span>
+            <button type="submit" className="botao-pilula" disabled={enviando}>
+              {enviando ? "Enviando…" : "Abrir chamado"} <span aria-hidden="true">＋</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </main>
   );
 }
